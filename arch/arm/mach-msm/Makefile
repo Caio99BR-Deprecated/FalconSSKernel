@@ -421,3 +421,4 @@ obj-$(CONFIG_WALL_CLK_SYSFS) += wallclk_sysfs.o
 obj-$(CONFIG_ARCH_RANDOM) += early_random.o
 obj-$(CONFIG_PERFMAP) += perfmap.o
 obj-y += last_radio_log.o last_ssr_kmsg.o
+obj-y += ramdump_proc_files.o

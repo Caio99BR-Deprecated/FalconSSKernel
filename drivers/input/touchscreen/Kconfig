@@ -254,6 +254,13 @@ config TOUCHSCREEN_EGALAX
 	  To compile this driver as a module, choose M here: the
 	  module will be called egalax_ts.
 
+config TOUCHSCREEN_ELAN_EKTF2K
+	tristate "elan ektf2k I2C Touchscreen"
+	depends on I2C
+	help
+	  Say Y here to enable support for I2C connected
+	  EKTF2K multi-touch panel.
+
 config TOUCHSCREEN_FUJITSU
 	tristate "Fujitsu serial touchscreen"
 	select SERIO

@@ -209,8 +209,8 @@ config OV8865
 		snapshot config = 3264 * 2448 at 30 fps.
 		Max fps is 30fps at 3264 * 2448, 60fps at 1632 * 1224
 
-config s5k4e1
-	bool "Sensor s5k4e1 (BAYER 5MP)"
+config S5K4E1
+	bool "Sensor S5K4E1 (BAYER 5MP)"
 	depends on MSMB_CAMERA
 	---help---
 		Samsung 5 MP Bayer Sensor. It uses 2 mipi lanes,

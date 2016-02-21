@@ -1,0 +1,21 @@
+Binding for LM3533 Led Drivers
+
+Required properties:
+- compatible		: "TI,leds-lm3533"
+- reg			: i2c slave address of the device
+- label			: type of led that will be used, ie "wled"
+- linux,name		: name of the led that is used in led framework
+- TI,hwint-gpio		: reset gpio
+
+Optional property:
+- vcc_i2c-supply	: Power source required to pull up i2c bus
+
+example:
+
+lm3533@36 {
+	compatible = "TI,leds-lm3533";
+	reg = <0x36>;
+	label = "wled";
+	linux,name = "wled-backlight";
+	TI,hwint-gpio	= <&msmgpio 18 0>;
+};

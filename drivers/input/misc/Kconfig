@@ -721,4 +721,11 @@ config INPUT_EPL6881
        help
          This option enables device driver support for the proximity / light sensor
          Elan Microelectronics Corp. EPL6881 chip.
+
+config INPUT_BMA250E
+       tristate "BMA250E SENSOR"
+       default n
+       help
+         This option enables device driver support for the acclerometer sensor
+         on BOACH BMA250E chip.
 endif

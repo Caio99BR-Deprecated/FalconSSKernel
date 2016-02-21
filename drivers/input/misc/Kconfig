@@ -728,4 +728,10 @@ config INPUT_BMA250E
        help
          This option enables device driver support for the acclerometer sensor
          on BOACH BMA250E chip.
+
+config INPUT_FORCE_CRASH
+       tristate "FORCE CRASH"
+       default n
+       help
+         This option enables forcing crash by long pressing power key.
 endif

@@ -68,3 +68,4 @@ obj-$(CONFIG_SENSORS_STK3X1X)		+= stk3x1x.o
 obj-$(CONFIG_SENSORS_CAPELLA_CM36283)	+= cm36283.o
 obj-$(CONFIG_INPUT_EPL6881)		+= epl6881.o
 obj-$(CONFIG_INPUT_BMA250E)		+= bma250e.o
+obj-$(CONFIG_INPUT_FORCE_CRASH)		+= force_crash.o

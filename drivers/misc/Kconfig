@@ -665,6 +665,16 @@ config TI_DRV2667
 	  To compile this driver as a module, choose M here: the
 	  module will be called ti_drv2667.
 
+config ARIMA_GPS_ELNA
+	tristate "GPS eLNA driver"
+	default n
+	---help---
+	  Say yes if you want GPS eLNA driver.
+	  If unsure, say N here.
+
+	  To compile this driver as a module, choose m here. The module will
+	  be called gps_elna.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"

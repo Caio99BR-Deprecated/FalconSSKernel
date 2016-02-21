@@ -218,6 +218,12 @@ config S5K4E1
 		and QSXGA snapshot at 15 fps.
 		This sensor driver does not support auto focus.
 
+config S5K5CA
+	bool "Sensor S5K5CA (YUV 3MP)"
+	depends on MSMB_CAMERA
+	---help---
+		S5K5CA is YUV sensor.
+
 config OV12830
 	bool "OmniVision OV12830 (BAYER 12MP)"
 	depends on MSMB_CAMERA

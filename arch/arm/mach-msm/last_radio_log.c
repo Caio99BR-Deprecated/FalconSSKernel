@@ -21,12 +21,19 @@
 #include <linux/proc_fs.h>
 #include <linux/uaccess.h>
 
+#include <linux/init.h>
+#include <linux/platform_device.h>
+#include <linux/of.h>
+
 #include "smd_private.h"
 
 static void *radio_log_base;
 static size_t radio_log_size;
 
-extern void *smem_item(unsigned id, unsigned *size);
+static size_t radio_log_max;
+static struct proc_dir_entry *radio_log_entry;
+
+extern void *smem_get_entry(unsigned id, unsigned *size);
 
 static ssize_t last_radio_log_read(struct file *file, char __user *buf,
 			size_t len, loff_t *offset)
@@ -52,32 +59,89 @@ static struct file_operations last_radio_log_fops = {
 	.llseek = default_llseek,
 };
 
-void msm_init_last_radio_log(struct module *owner)
+void last_radio_log_write(void)
 {
-	struct proc_dir_entry *entry;
+	char *x;
+	int size = 0;
+
+	x = smem_get_entry(SMEM_ERR_CRASH_LOG, &size);
+	if (x != 0) {
+		x[size - 1] = 0;
+		pr_err("%s: CRASH LOG\n'%s'\n", __func__, x);
+	}
+
+	if (radio_log_base != NULL) {
+		if (size > radio_log_max) {
+			size = radio_log_max;
+		}
+		pr_err("%s:  copy %d byte to 0x%x\n", __func__, size, (unsigned)radio_log_base);
+		memcpy(radio_log_base, x, size);
+		((char *)radio_log_base)[size-1] = 0;
+		radio_log_size = strlen((char *)radio_log_base);
+		radio_log_entry->size = radio_log_size;
+	}
+}
+
+EXPORT_SYMBOL(last_radio_log_write);
+
+static int __devinit last_radio_log_probe(struct platform_device *pdev)
+{
+	int of_ret = 0;
+	u32 of_val[2];
+
+	if (!(pdev->dev.of_node)) {
+		pr_err("%s: device tree not enabled\n", __func__);
+		return -EFAULT;
+	}
 
 	if (last_radio_log_fops.owner) {
 		pr_err("%s: already claimed\n", __func__);
-		return;
+		return -EFAULT;
 	}
 
-	radio_log_base = smem_item(SMEM_CLKREGIM_BSP, &radio_log_size);
-	if (!radio_log_base) {
-		pr_err("%s: could not retrieve SMEM_CLKREGIM_BSP\n", __func__);
-		return;
+	of_ret = of_property_read_u32_array(pdev->dev.of_node, "qcom,memory-fixed", of_val, 2);
+	if (of_ret) {
+		pr_err("%s: device tree configuration error\n", __func__);
+		return -EFAULT;
 	}
 
-	entry = create_proc_entry("last_radio_log", S_IFREG | S_IRUGO, NULL);
-	if (!entry) {
+	radio_log_base = ioremap(of_val[0], of_val[1]);
+	radio_log_max = of_val[1];
+	radio_log_size = strlen((char *)radio_log_base);
+
+	radio_log_entry = create_proc_entry("last_amsslog", S_IFREG | S_IRUGO, NULL);
+	if (!radio_log_entry) {
 		pr_err("%s: could not create proc entry for radio log\n",
 				__func__);
-		return;
+		return -EFAULT;
 	}
 
 	pr_err("%s: last radio log is %d bytes long\n", __func__,
 		radio_log_size);
-	last_radio_log_fops.owner = owner;
-	entry->proc_fops = &last_radio_log_fops;
-	entry->size = radio_log_size;
+	last_radio_log_fops.owner = THIS_MODULE;
+	radio_log_entry->proc_fops = &last_radio_log_fops;
+	radio_log_entry->size = radio_log_size;
+
+	return 0;
 }
-EXPORT_SYMBOL(msm_init_last_radio_log);
+
+static struct of_device_id last_radio_log_dt_match[] = {
+	{	.compatible = "qcom,last-radio-log",
+	},
+	{}
+};
+
+static struct platform_driver last_radio_log_driver = {
+	.driver		= {
+		.name	= "last_radio_log",
+		.of_match_table = last_radio_log_dt_match,
+	},
+	.probe = last_radio_log_probe,
+};
+
+static int __init last_radio_log_module_init(void)
+{
+	return platform_driver_register(&last_radio_log_driver);
+}
+
+postcore_initcall(last_radio_log_module_init);

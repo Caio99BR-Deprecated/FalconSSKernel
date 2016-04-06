@@ -1,0 +1,70 @@
+#!/sbin/sh
+
+# Get values used in original zip
+interface="${1}"
+updater_fd="${2}"
+zipfile="${3}"
+
+# Set ui_print
+ui_print() {
+    echo -en "ui_print ${1}\n\n" > /proc/self/fd/"${updater_fd}"
+}
+
+# Start main process
+START=$(date +"%s")
+
+rm -rf /tmp/kernel/
+mkdir -p /tmp/kernel/
+cd /tmp/kernel/
+
+unzip "${zipfile}"
+
+name="$(sed -n '1p' /tmp/kernel/device.prop)"
+release="$(sed -n '2p' /tmp/kernel/device.prop)"
+
+ui_print "Caio99BR Presents"
+ui_print "CAFKernel"
+ui_print "For ${name}"
+ui_print "Release ${release}"
+
+if [ `mount | grep /system | wc -l` -ge 1 ]; then SUSER="true"; fi
+if [ `mount | grep /data | wc -l` -ge 1 ]; then DUSER="true"; fi
+
+if [ "$SUSER" == "true" ]; then umount /system; ui_print "Desmounting /system"; fi
+if [ "$DUSER" == "true" ]; then umount /data; ui_print "Desmounting /data"; fi
+
+mount /system
+mount /data
+
+ui_print "Copying the modules to system"
+rm -rf /system/lib/modules/*.ko /system/lib/modules/pronto/pronto_wlan.ko
+
+cp /tmp/kernel/modules/*.ko /system/lib/modules/
+
+mv /system/lib/modules/wlan.ko /system/lib/modules/pronto/pronto_wlan.ko
+ln -s /system/lib/modules/pronto/pronto_wlan.ko /system/lib/modules/wlan.ko
+
+busybox chmod 644 /system/lib/modules/*.ko
+busybox chmod 644 /system/lib/modules/pronto/*.ko
+
+cp /tmp/kernel/wifi/WCNSS_cfg.dat /system/etc/firmware/wlan/prima/WCNSS_cfg.dat
+busybox chmod 644 /system/etc/firmware/wlan/prima/WCNSS_cfg.dat
+
+cp /tmp/kernel/wifi/WCNSS_qcom_* /data/misc/wifi/WCNSS_qcom_*
+busybox chmod 660 /data/misc/wifi/WCNSS_qcom_*
+
+ui_print "Flashing Falcon SS Custom Kernel!"
+dd if=/tmp/kernel/boot.img of=/dev/block/platform/msm_sdcc.1/by-name/boot
+
+umount /system
+umount /data
+
+if [ "$SUSER" == "true" ]; then mount /system; ui_print "Remounting /system"; fi
+if [ "$DUSER" == "true" ]; then mount /data; ui_print "Remounting /data"; fi
+
+END=$(date +"%s")
+BUILDTIME=$(($END - $START))
+
+rm -rf /tmp/kernel/
+
+ui_print "Done in $(($BUILDTIME % 60)) seconds."

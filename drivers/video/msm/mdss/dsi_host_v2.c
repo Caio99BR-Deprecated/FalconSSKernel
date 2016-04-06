@@ -1569,6 +1569,8 @@ static int __devinit msm_dsi_probe(struct platform_device *pdev)
 	intf.cont_on = msm_dsi_cont_on;
 	intf.clk_ctrl = msm_dsi_clk_ctrl;
 	intf.op_mode_config = msm_dsi_op_mode_config;
+	intf.tx = msm_dsi_cmds_tx;
+	intf.rx = msm_dsi_cmds_rx;
 	intf.index = 0;
 	intf.private = NULL;
 	dsi_register_interface(&intf);

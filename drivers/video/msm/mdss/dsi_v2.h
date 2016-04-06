@@ -29,6 +29,10 @@ struct dsi_interface {
 	int (*cont_on)(struct mdss_panel_data *pdata);
 	int (*clk_ctrl)(struct mdss_panel_data *pdata, int enable);
 	void (*op_mode_config)(int mode, struct mdss_panel_data *pdata);
+	int (*tx)(struct mdss_dsi_ctrl_pdata *ctrl,
+			struct dsi_cmd_desc *cmds, int cnt);
+	int (*rx)(struct mdss_dsi_ctrl_pdata *ctrl,
+			struct dsi_cmd_desc *cmds, int rlen);
 	int index;
 	void *private;
 };

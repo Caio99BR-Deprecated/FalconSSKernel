@@ -22,6 +22,12 @@
 
 static struct dsi_interface dsi_intf;
 
+unsigned long esd_timer_duration = (2*HZ);
+static struct workqueue_struct *dsi_esd_wq;
+static struct delayed_work dsi_esd_wq_worker;
+static struct mdss_panel_data *panel_info_local;
+static int cancel_quene_result=1;
+
 static int dsi_off(struct mdss_panel_data *pdata)
 {
 	int rc = 0;
@@ -63,20 +69,29 @@ static int dsi_panel_handler(struct mdss_panel_data *pdata, int enable)
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
 
+	panel_info_local = pdata;
 	if (enable) {
 		dsi_ctrl_gpio_request(ctrl_pdata);
 		mdss_dsi_panel_reset(pdata, 1);
 		pdata->panel_info.panel_power_on = 1;
 		rc = ctrl_pdata->on(pdata);
+		msleep(20);
+		cancel_quene_result = 1;
+		queue_delayed_work(dsi_esd_wq,
+						   &dsi_esd_wq_worker,
+						   esd_timer_duration);
 		if (rc)
 			pr_err("dsi_panel_handler panel on failed %d\n", rc);
 	} else {
 		if (dsi_intf.op_mode_config)
 			dsi_intf.op_mode_config(DSI_CMD_MODE, pdata);
+		cancel_quene_result=cancel_delayed_work(&dsi_esd_wq_worker);
+		flush_delayed_work(&dsi_esd_wq_worker);
 		rc = ctrl_pdata->off(pdata);
 		pdata->panel_info.panel_power_on = 0;
 		mdss_dsi_panel_reset(pdata, 0);
 		dsi_ctrl_gpio_free(ctrl_pdata);
+		cancel_delayed_work(&dsi_esd_wq_worker);
 	}
 	return rc;
 }
@@ -450,6 +465,31 @@ int dsi_ctrl_config_init(struct platform_device *pdev,
 
 	return 0;
 }
+
+static void dsi_esd_wq_workqueue_handler(struct work_struct *work)
+{
+	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
+	int rc = 0;
+
+	ctrl_pdata = container_of(panel_info_local, struct mdss_dsi_ctrl_pdata,
+				panel_data);
+
+	dsi_set_tx_power_mode(0);
+		rc = dsi_intf.tx(ctrl_pdata,
+					ctrl_pdata->esd_cmds.cmds,
+					ctrl_pdata->esd_cmds.cmd_cnt);
+	dsi_set_tx_power_mode(1);
+
+	if (rc)
+		pr_err("dsi_esd_wq_workqueue_handler failed %d\n", rc);
+		if (cancel_quene_result != 0) {
+			queue_delayed_work(dsi_esd_wq,
+					   &dsi_esd_wq_worker,
+					   esd_timer_duration);
+		} else
+			printk(KERN_INFO "tracy:quene flush has active!");
+}
+
 int dsi_panel_device_register_v2(struct platform_device *dev,
 				struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 {
@@ -458,6 +498,9 @@ int dsi_panel_device_register_v2(struct platform_device *dev,
 	u8 lanes = 0, bpp;
 	u32 h_period, v_period;
 	struct mdss_panel_info *pinfo = &(ctrl_pdata->panel_data.panel_info);
+
+	dsi_esd_wq = create_singlethread_workqueue("dsi_esd_wq");
+	INIT_DELAYED_WORK(&dsi_esd_wq_worker, dsi_esd_wq_workqueue_handler);
 
 	h_period = ((pinfo->lcdc.h_pulse_width)
 			+ (pinfo->lcdc.h_back_porch)

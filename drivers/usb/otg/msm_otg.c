@@ -54,7 +54,7 @@
 #define DRIVER_NAME	"msm_otg"
 
 #define ID_TIMER_FREQ		(jiffies + msecs_to_jiffies(500))
-#define CHG_RECHECK_DELAY	(jiffies + msecs_to_jiffies(2000))
+#define CHG_RECHECK_DELAY	(jiffies + msecs_to_jiffies(3000))
 #define ULPI_IO_TIMEOUT_USEC	(10 * 1000)
 #define USB_PHY_3P3_VOL_MIN	3050000 /* uV */
 #define USB_PHY_3P3_VOL_MAX	3300000 /* uV */
@@ -1354,7 +1354,7 @@ static int msm_otg_notify_power_supply(struct msm_otg *motg, unsigned mA)
 			goto psy_error;
 		if (power_supply_set_current_limit(psy, 1000*mA))
 			goto psy_error;
-	} else if (motg->cur_power > 0 && (mA == 0 || mA == 2)) {
+	} else if (motg->cur_power >= 0 && (mA == 0 || mA == 2)) {
 		/* Disable charging */
 		if (power_supply_set_online(psy, false))
 			goto psy_error;
@@ -1413,7 +1413,7 @@ static void msm_otg_notify_charger(struct msm_otg *motg, unsigned mA)
 	if (motg->online && motg->cur_power == 0  && mA == 0)
 		msm_otg_set_online_status(motg);
 
-	if (motg->cur_power == mA)
+	if (motg->cur_power == mA && mA!=0)
 		return;
 
 	dev_info(motg->phy.dev, "Avail curr from USB = %u\n", mA);
@@ -1877,6 +1877,15 @@ static void msm_otg_chg_check_timer_func(unsigned long data)
 		dev_dbg(otg->phy->dev, "DCP is detected as SDP\n");
 		set_bit(B_FALSE_SDP, &motg->inputs);
 		queue_work(system_nrt_wq, &motg->sm_work);
+	}
+
+	if (0) {
+		if(otg->phy->state == OTG_STATE_B_PERIPHERAL) {
+		    motg->chg_type = USB_SDP_CHARGER;
+		    otg->phy->state = OTG_STATE_B_IDLE;
+		    msm_otg_notify_charger(motg,500);
+		    printk(KERN_EMERG "%s can we do something here ?? \n", __func__);
+		}
 	}
 }
 
@@ -3706,7 +3715,7 @@ static int otg_power_get_property_usb(struct power_supply *psy,
 		val->intval = motg->online;
 		break;
 	case POWER_SUPPLY_PROP_TYPE:
-		val->intval = psy->type;
+		val->intval = motg->chg_type;
 		break;
 	case POWER_SUPPLY_PROP_HEALTH:
 		val->intval = motg->usbin_health;
@@ -3740,9 +3749,6 @@ static int otg_power_set_property_usb(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_CURRENT_MAX:
 		motg->current_max = val->intval;
-		break;
-	case POWER_SUPPLY_PROP_TYPE:
-		psy->type = val->intval;
 		break;
 	case POWER_SUPPLY_PROP_HEALTH:
 		motg->usbin_health = val->intval;

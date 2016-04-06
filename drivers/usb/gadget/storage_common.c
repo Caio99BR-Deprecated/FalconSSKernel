@@ -182,6 +182,10 @@ struct interrupt_data {
 #define ASC(x)		((u8) ((x) >> 8))
 #define ASCQ(x)		((u8) (x))
 
+/* VPD(Vital product data) Page Name */
+#define VPD_SUPPORTED_VPD_PAGES		0x00
+#define VPD_UNIT_SERIAL_NUMBER		0x80
+#define VPD_DEVICE_IDENTIFICATION	0x83
 
 /*-------------------------------------------------------------------------*/
 
@@ -207,6 +211,7 @@ struct fsg_lun {
 	unsigned int	blkbits;	/* Bits of logical block size of bound block device */
 	unsigned int	blksize;	/* logical block size of bound block device */
 	struct device	dev;
+	char		*lun_filename;
 #ifdef CONFIG_USB_MSC_PROFILING
 	spinlock_t	lock;
 	struct {
@@ -944,15 +949,66 @@ static ssize_t fsg_store_file(struct device *dev, struct device_attribute *attr,
 	if (fsg_lun_is_open(curlun)) {
 		fsg_lun_close(curlun);
 		curlun->unit_attention_data = SS_MEDIUM_NOT_PRESENT;
+		kfree(curlun->lun_filename);
+		curlun->lun_filename = NULL;
 	}
 
 	/* Load new medium */
 	if (count > 0 && buf[0]) {
 		rc = fsg_lun_open(curlun, buf);
-		if (rc == 0)
-			curlun->unit_attention_data =
+		if (rc == 0) {
+			kfree(curlun->lun_filename);
+			curlun->lun_filename = kmalloc(count+1, GFP_KERNEL);
+			if (!curlun->lun_filename) {
+				rc = -ENOMEM;
+				fsg_lun_close(curlun);
+				curlun->unit_attention_data =
+					SS_MEDIUM_NOT_PRESENT;
+			} else {
+				memcpy(curlun->lun_filename, buf, count);
+				curlun->lun_filename[count] = '\0';
+				curlun->unit_attention_data =
 					SS_NOT_READY_TO_READY_TRANSITION;
+			}
+		}
 	}
 	up_write(filesem);
 	return (rc < 0 ? rc : count);
+}
+
+static ssize_t fsg_show_cdrom(struct device *dev, struct device_attribute *attr,
+			   char *buf)
+{
+	struct fsg_lun	*curlun = fsg_lun_from_dev(dev);
+
+	return sprintf(buf, "%d\n", curlun->cdrom);
+}
+
+static ssize_t fsg_store_cdrom(struct device *dev, struct device_attribute *attr,
+			    const char *buf, size_t count)
+{
+	ssize_t		rc;
+	struct fsg_lun	*curlun = fsg_lun_from_dev(dev);
+	struct rw_semaphore	*filesem = dev_get_drvdata(dev);
+	unsigned	cdrom;
+
+	rc = kstrtouint(buf, 2, &cdrom);
+	if (rc)
+		return rc;
+
+	/*
+	 * Allow the write-enable status to change only while the
+	 * backing file is closed.
+	 */
+	down_read(filesem);
+	if (fsg_lun_is_open(curlun)) {
+		LDBG(curlun, "cdrom status change prevented\n");
+		rc = -EBUSY;
+	} else {
+		curlun->cdrom = cdrom;
+		LDBG(curlun, "cdrom status set to %d\n", curlun->cdrom);
+		rc = count;
+	}
+	up_read(filesem);
+	return rc;
 }

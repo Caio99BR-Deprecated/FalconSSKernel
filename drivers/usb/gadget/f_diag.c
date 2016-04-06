@@ -27,6 +27,26 @@
 #include <linux/workqueue.h>
 #include <linux/debugfs.h>
 
+/* string descriptors: */
+
+#define DIAG_INTERFACE_IDX	0
+
+/* static strings, in UTF-8 */
+static struct usb_string diag_string_defs[] = {
+	[DIAG_INTERFACE_IDX].s = "Diagnostics",
+	{  /* ZEROES END LIST */ },
+};
+
+static struct usb_gadget_strings diag_string_table = {
+	.language =		0x0409,	/* en-us */
+	.strings =		diag_string_defs,
+};
+
+static struct usb_gadget_strings *diag_strings[] = {
+	&diag_string_table,
+	NULL,
+};
+
 static DEFINE_SPINLOCK(ch_lock);
 static LIST_HEAD(usb_diag_ch_list);
 
@@ -644,6 +664,9 @@ static void diag_function_unbind(struct usb_configuration *c,
 		ctxt->ch->priv_usb = NULL;
 	list_del(&ctxt->list_item);
 	/* Free any pending USB requests from last session */
+
+	diag_string_defs[DIAG_INTERFACE_IDX].id = 0;
+
 	spin_lock_irqsave(&ctxt->lock, flags);
 	free_reqs(ctxt);
 	spin_unlock_irqrestore(&ctxt->lock, flags);
@@ -738,6 +761,14 @@ int diag_function_add(struct usb_configuration *c, const char *name,
 		return -ENODEV;
 	}
 
+	if (diag_string_defs[DIAG_INTERFACE_IDX].id == 0) {
+		int id = usb_string_id(c->cdev);
+		if (id < 0)
+			return id;
+		diag_string_defs[DIAG_INTERFACE_IDX].id = id;
+		intf_desc.iInterface = id;
+	}
+
 	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
 	if (!dev)
 		return -ENOMEM;
@@ -761,6 +792,7 @@ int diag_function_add(struct usb_configuration *c, const char *name,
 	dev->function.unbind = diag_function_unbind;
 	dev->function.set_alt = diag_function_set_alt;
 	dev->function.disable = diag_function_disable;
+	dev->function.strings = diag_strings;
 	spin_lock_init(&dev->lock);
 	INIT_LIST_HEAD(&dev->read_pool);
 	INIT_LIST_HEAD(&dev->write_pool);

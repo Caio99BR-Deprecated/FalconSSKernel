@@ -339,6 +339,62 @@ struct {
 	},
 };
 
+/* MTP + ADB */
+struct {
+	struct mtp_ext_config_desc_header	header;
+	struct mtp_ext_config_desc_function    f_mtp;
+	struct mtp_ext_config_desc_function    f_adb;
+} mtp_adb_ext_config_desc = {
+	.header = {
+		.dwLength = __constant_cpu_to_le32(sizeof(mtp_adb_ext_config_desc)),
+		.bcdVersion = __constant_cpu_to_le16(0x0100),
+		.wIndex = __constant_cpu_to_le16(4),
+		.bCount = __constant_cpu_to_le16(2),
+	},
+	.f_mtp = {
+		.bFirstInterfaceNumber = 0,
+		.bInterfaceCount = 1,
+		.compatibleID = { 'M', 'T', 'P' },
+	},
+	.f_adb = {
+		.bFirstInterfaceNumber = 1,
+		.bInterfaceCount = 1,
+	},
+};
+
+/* MTP + ADB eng mode */
+struct {
+	struct mtp_ext_config_desc_header	header;
+	struct mtp_ext_config_desc_function    f_diag;
+	struct mtp_ext_config_desc_function    f_adb;
+	struct mtp_ext_config_desc_function    f_serial;
+	struct mtp_ext_config_desc_function    f_mtp;
+} mtp_adb_eng_ext_config_desc = {
+	.header = {
+		.dwLength = __constant_cpu_to_le32(sizeof(mtp_adb_eng_ext_config_desc)),
+		.bcdVersion = __constant_cpu_to_le16(0x0100),
+		.wIndex = __constant_cpu_to_le16(4),
+		.bCount = __constant_cpu_to_le16(4),
+	},
+	.f_diag = {
+		.bFirstInterfaceNumber = 0,
+		.bInterfaceCount = 1,
+	},
+	.f_adb = {
+		.bFirstInterfaceNumber = 1,
+		.bInterfaceCount = 1,
+	},
+	.f_serial = {
+		.bFirstInterfaceNumber = 2,
+		.bInterfaceCount = 2,
+	},
+	.f_mtp = {
+		.bFirstInterfaceNumber = 4,
+		.bInterfaceCount = 1,
+		.compatibleID = { 'M', 'T', 'P' },
+	},
+};
+
 struct mtp_device_status {
 	__le16	wLength;
 	__le16	wCode;
@@ -1258,6 +1314,7 @@ mtp_function_unbind(struct usb_configuration *c, struct usb_function *f)
 	while ((req = mtp_req_get(dev, &dev->intr_idle)))
 		mtp_request_free(req, dev->ep_intr);
 	dev->state = STATE_OFFLINE;
+	mtp_string_defs[INTERFACE_STRING_INDEX].id = 0;
 }
 
 static int mtp_function_set_alt(struct usb_function *f,

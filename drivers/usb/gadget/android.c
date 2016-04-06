@@ -1859,8 +1859,89 @@ static DEVICE_ATTR(inquiry_string, S_IRUGO | S_IWUSR,
 					mass_storage_inquiry_show,
 					mass_storage_inquiry_store);
 
+static ssize_t mass_storage_serial_number_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct android_usb_function *f = dev_get_drvdata(dev);
+	struct mass_storage_function_config *config = f->config;
+	return snprintf(buf, PAGE_SIZE, "%s\n", config->common->serial_number);
+}
+
+static ssize_t mass_storage_serial_number_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct android_usb_function *f = dev_get_drvdata(dev);
+	struct mass_storage_function_config *config = f->config;
+	if (size >= sizeof(config->common->serial_number))
+		return -EINVAL;
+	return snprintf(config->common->serial_number,
+			sizeof(config->common->serial_number),
+			"%s",
+			buf);
+}
+
+static DEVICE_ATTR(serial_number, S_IRUGO | S_IWUSR,
+					mass_storage_serial_number_show,
+					mass_storage_serial_number_store);
+
+static ssize_t mass_storage_eui64_id_show(struct device *dev,
+				struct device_attribute *attr, char *buf)
+{
+	struct android_usb_function *f = dev_get_drvdata(dev);
+	struct mass_storage_function_config *config = f->config;
+	return snprintf(buf, PAGE_SIZE, "%02x%02x%02x%02x%02x%02x%02x%02x\n",
+			config->common->eui64_id.ieee_company_id[0],
+			config->common->eui64_id.ieee_company_id[1],
+			config->common->eui64_id.ieee_company_id[2],
+			config->common->eui64_id.vendor_specific_ext_field[0],
+			config->common->eui64_id.vendor_specific_ext_field[1],
+			config->common->eui64_id.vendor_specific_ext_field[2],
+			config->common->eui64_id.vendor_specific_ext_field[3],
+			config->common->eui64_id.vendor_specific_ext_field[4]);
+}
+
+static ssize_t mass_storage_eui64_id_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t size)
+{
+	struct android_usb_function *f = dev_get_drvdata(dev);
+	struct mass_storage_function_config *config = f->config;
+	int ret;
+	char tmp[3];
+	u8 val;
+	int i;
+	int offset = 0;
+
+	if (size < sizeof(config->common->eui64_id) * 2)
+		return -EINVAL;
+	tmp[2] = '\0';
+	for (i = 0; i < sizeof(config->common->eui64_id.ieee_company_id); i++) {
+		memcpy(tmp, &buf[i * 2], 2);
+		ret = kstrtou8((const char *)tmp, 16, &val);
+		if (ret)
+			return ret;
+		config->common->eui64_id.ieee_company_id[i] = val;
+		offset += 2;
+	}
+	for (i = 0; i < sizeof(
+		config->common->eui64_id.vendor_specific_ext_field); i++) {
+		memcpy(tmp, &buf[offset + i * 2], 2);
+		ret = kstrtou8((const char *)tmp, 16, &val);
+		if (ret)
+			return ret;
+		config->common->eui64_id.vendor_specific_ext_field[i] = val;
+	}
+
+	return sizeof(config->common->eui64_id);
+}
+
+static DEVICE_ATTR(eui64_id, S_IRUGO | S_IWUSR,
+					mass_storage_eui64_id_show,
+					mass_storage_eui64_id_store);
+
 static struct device_attribute *mass_storage_function_attributes[] = {
 	&dev_attr_inquiry_string,
+	&dev_attr_serial_number,
+	&dev_attr_eui64_id,
 	NULL
 };
 
@@ -2208,6 +2289,16 @@ static int android_enable_function(struct android_dev *dev,
 	struct usb_gadget *gadget = dev->cdev->gadget;
 
 	while ((f = *functions++)) {
+		if (!strcmp(name, "cdrom") && !strcmp(f->name, "mass_storage")) {
+			f_holder = kzalloc(sizeof(*f_holder),
+						GFP_KERNEL);
+			f->android_dev = dev;
+			f_holder->f = f;
+			list_add_tail(&f_holder->enabled_list,
+					      &conf->enabled_functions);
+			return 0;
+		}
+
 		if (!strcmp(name, f->name)) {
 			if (f->android_dev && f->android_dev != dev)
 				pr_err("%s is enabled in other device\n",
@@ -2404,6 +2495,7 @@ static ssize_t enable_store(struct device *pdev, struct device_attribute *attr,
 	bool audio_enabled = false;
 	static DEFINE_RATELIMIT_STATE(rl, 10*HZ, 1);
 	int err = 0;
+	int id = 0;
 
 	if (!cdev)
 		return -ENODEV;
@@ -2422,6 +2514,31 @@ static ssize_t enable_store(struct device *pdev, struct device_attribute *attr,
 		cdev->desc.bDeviceClass = device_desc.bDeviceClass;
 		cdev->desc.bDeviceSubClass = device_desc.bDeviceSubClass;
 		cdev->desc.bDeviceProtocol = device_desc.bDeviceProtocol;
+
+		if (strings_dev[STRING_MANUFACTURER_IDX].id == 0) {
+			id = usb_string_id(cdev);
+			if (id >= 0) {
+				strings_dev[STRING_MANUFACTURER_IDX].id = id;
+				device_desc.iManufacturer = id;
+				cdev->desc.iManufacturer = id;
+			}
+		}
+		if (strings_dev[STRING_PRODUCT_IDX].id == 0) {
+			id = usb_string_id(cdev);
+			if (id >= 0) {
+				strings_dev[STRING_PRODUCT_IDX].id = id;
+				device_desc.iProduct = id;
+				cdev->desc.iProduct = id;
+			}
+		}
+		if (strings_dev[STRING_SERIAL_IDX].id == 0) {
+			id = usb_string_id(cdev);
+			if (id >= 0) {
+				strings_dev[STRING_SERIAL_IDX].id = id;
+				device_desc.iSerialNumber = id;
+				cdev->desc.iSerialNumber = id;
+			}
+		}
 
 		/* Audio dock accessory is unable to enumerate device if
 		 * pull-up is enabled immediately. The enumeration is
@@ -2455,6 +2572,10 @@ static ssize_t enable_store(struct device *pdev, struct device_attribute *attr,
 				if (f_holder->f->disable)
 					f_holder->f->disable(f_holder->f);
 			}
+		strings_dev[STRING_MANUFACTURER_IDX].id = 0;
+		strings_dev[STRING_PRODUCT_IDX].id = 0;
+		strings_dev[STRING_SERIAL_IDX].id = 0;
+		cdev->next_string_id = 0;
 		dev->enabled = false;
 	} else if (__ratelimit(&rl)) {
 		pr_err("android_usb: already %s\n",
@@ -2698,6 +2819,64 @@ static struct usb_composite_driver android_usb_driver = {
 	.max_speed	= USB_SPEED_SUPER
 };
 
+static int ms_os_desc_setup(struct usb_composite_dev *cdev, const struct usb_ctrlrequest *ctrl)
+{
+	int	value = -EOPNOTSUPP;
+	u16	w_index = le16_to_cpu(ctrl->wIndex);
+	u16	w_value = le16_to_cpu(ctrl->wValue);
+	u16	w_length = le16_to_cpu(ctrl->wLength);
+
+	pr_debug("ms_os_desc_setup "
+			"%02x.%02x v%04x i%04x l%u\n",
+			ctrl->bRequestType, ctrl->bRequest,
+			w_value, w_index, w_length);
+
+	if ((ctrl->bRequestType & USB_TYPE_MASK) == USB_TYPE_VENDOR) {
+		/* Handle Microsoft OS descriptor */
+		pr_debug("vendor request: %d index: %d value: %d length: %d vid %04X pid %04X\n",
+			ctrl->bRequest, w_index, w_value, w_length, cdev->desc.idVendor, cdev->desc.idProduct);
+
+		if (ctrl->bRequest == 1
+				&& (ctrl->bRequestType & USB_DIR_IN)
+				&& (w_index == 4 || w_index == 5 )) {
+			if (cdev->desc.idVendor == 0x0FCE) {
+				/* SoMC */
+				if ((cdev->desc.idProduct & 0xF000) == 0x0000) {
+					/* MTP Only */
+					value = (w_length < sizeof(mtp_ext_config_desc) ?
+						w_length : sizeof(mtp_ext_config_desc));
+					memcpy(cdev->req->buf, &mtp_ext_config_desc, value);
+				} else if (((cdev->desc.idProduct & 0xF000) == 0x4000) ||
+					   ((cdev->desc.idProduct & 0xF000) == 0x5000)) {
+					/* MTP + CDROM or MTP + ADB */
+					if ((cdev->desc.idProduct & 0x0FFF) == 0x0146) {
+						/* eng mode */
+						value = (w_length < sizeof(mtp_adb_eng_ext_config_desc) ?
+							w_length : sizeof(mtp_adb_eng_ext_config_desc));
+						memcpy(cdev->req->buf, &mtp_adb_eng_ext_config_desc, value);
+					} else {
+						/* userdebug mode or user mode */
+						value = (w_length < sizeof(mtp_adb_ext_config_desc) ?
+							w_length : sizeof(mtp_adb_ext_config_desc));
+						memcpy(cdev->req->buf, &mtp_adb_ext_config_desc, value);
+					}
+				}
+			}
+		}
+	}
+
+	/* respond with data transfer or status phase? */
+	if (value >= 0) {
+		int rc;
+		cdev->req->zero = value < w_length;
+		cdev->req->length = value;
+		rc = usb_ep_queue(cdev->gadget->ep0, cdev->req, GFP_ATOMIC);
+		if (rc < 0)
+			pr_err("%s setup response queue error\n", __func__);
+	}
+	return value;
+}
+
 static int
 android_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *c)
 {
@@ -2715,6 +2894,9 @@ android_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *c)
 	req->length = 0;
 	gadget->ep0->driver_data = cdev;
 
+	value = ms_os_desc_setup(cdev, c);
+
+	if (value < 0) {
 	list_for_each_entry(conf, &dev->configs, list_item)
 		list_for_each_entry(f_holder,
 				    &conf->enabled_functions,
@@ -2726,6 +2908,7 @@ android_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *c)
 					break;
 			}
 		}
+	}
 
 	/* Special case the accessory function.
 	 * It needs to handle control requests before it is enabled.

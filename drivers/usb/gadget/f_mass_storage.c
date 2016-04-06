@@ -314,6 +314,14 @@ static const char fsg_string_interface[] = "Mass Storage";
 static int write_error_after_csw_sent;
 static int csw_hack_sent;
 #endif
+
+/*
+ * Max length of Serial number = Max allocation length (255 bytes) - Peripheral
+ * qualifier (1 byte) - page code (1 byte) - reserved (1 byte) - page length
+ * (1 byte) - NUL byte(1byte) = 250 bytes
+ */
+#define USB_SERIAL_NUMBER_MAX_LEN	250
+
 /*-------------------------------------------------------------------------*/
 
 struct fsg_dev;
@@ -344,6 +352,12 @@ struct fsg_operations {
 	int (*post_eject)(struct fsg_common *common,
 			  struct fsg_lun *lun, int num);
 };
+
+/* EUI-64 identifier format for Device Identification VPD page */
+struct eui64_id {
+	u8 ieee_company_id[3];
+	u8 vendor_specific_ext_field[5];
+} __packed;
 
 /* Data shared by all the FSG instances. */
 struct fsg_common {
@@ -406,6 +420,9 @@ struct fsg_common {
 	 * hexadecimal digits) and NUL byte
 	 */
 	char inquiry_string[8 + 16 + 4 + 1];
+	/* inquiry */
+	char			serial_number[USB_SERIAL_NUMBER_MAX_LEN + 1];
+	struct eui64_id		eui64_id;
 
 	struct kref		ref;
 };
@@ -1277,6 +1294,9 @@ static int do_inquiry(struct fsg_common *common, struct fsg_buffhd *bh)
 {
 	struct fsg_lun *curlun = common->curlun;
 	u8	*buf = (u8 *) bh->buf;
+	u8	evpd;
+	u8	page_code;
+	u16	len;
 
 	if (!curlun) {		/* Unsupported LUNs are okay */
 		common->bad_lun_okay = 1;
@@ -1286,9 +1306,82 @@ static int do_inquiry(struct fsg_common *common, struct fsg_buffhd *bh)
 		return 36;
 	}
 
+	evpd = common->cmnd[1] & 0x1;
+	page_code = common->cmnd[2];
+	if (evpd == 0 && page_code) {
+		curlun->sense_data = SS_INVALID_FIELD_IN_CDB;
+		return -EINVAL;
+	}
+
+	if (evpd == 1) {
+		buf[0] = curlun->cdrom ? TYPE_ROM : TYPE_DISK;
+		switch (page_code) {
+		case VPD_SUPPORTED_VPD_PAGES:
+			buf[1] = 0; /* page code */
+			buf[2] = 0; /* Reserved */
+			buf[3] = 3; /* PAGE LENGTH */
+			/* Supported VPD page list */
+			buf[4] = VPD_SUPPORTED_VPD_PAGES;
+			buf[5] = VPD_UNIT_SERIAL_NUMBER;
+			buf[6] = VPD_DEVICE_IDENTIFICATION;
+			return 7;
+
+		case VPD_UNIT_SERIAL_NUMBER:
+			buf[1] = VPD_UNIT_SERIAL_NUMBER; /* page code */
+			buf[2] = 0; /* Reserved */
+
+			/* PAGE LENGTH */
+			len = strnlen(common->serial_number,
+					USB_SERIAL_NUMBER_MAX_LEN) + 1;
+			if (len > common->data_size_from_cmnd - 4)
+				len = common->data_size_from_cmnd - 4;
+			buf[3] = len;
+
+			/* PRODUCT SERIAL NUMBER */
+			strlcpy(&buf[4], common->serial_number, len);
+			len += 4;
+
+			/* Adjustment data size which send to IN buffer */
+			if (len < common->data_size_from_cmnd) {
+				common->data_size_from_cmnd = len;
+				common->residue = len;
+			}
+
+			return len;
+
+		case VPD_DEVICE_IDENTIFICATION:
+			buf[1] = VPD_DEVICE_IDENTIFICATION; /* page code */
+			buf[2] = 0;  /* PAGE LENGTH (MSB) */
+			buf[3] = 12; /* PAGE LENGTH (LSB) */
+
+			/* Identification descriptor list */
+			buf[4] = 1;  /* CODE SET */
+			buf[5] = 2;  /* IDENTIFIER TYPE */
+			buf[6] = 0;  /* Reserved */
+			buf[7] = 8;  /* IDENTIFIER LENGTH (n-3) */
+
+			/* IEEE COMPANY_ID */
+			memcpy(&buf[8], common->eui64_id.ieee_company_id,
+				sizeof(common->eui64_id.ieee_company_id));
+
+			/* VENDOR SPECIFIC EXTENSION IDENTIFIER */
+			memcpy(&buf[11],
+				common->eui64_id.vendor_specific_ext_field,
+				sizeof(common->eui64_id.
+					vendor_specific_ext_field));
+
+			/* Adjustment data size which send to IN buffer */
+			len = 16;
+			if (len < common->data_size_from_cmnd) {
+				common->data_size_from_cmnd = len;
+				common->residue = len;
+			}
+			return len;
+		}
+	}
 	buf[0] = curlun->cdrom ? TYPE_ROM : TYPE_DISK;
 	buf[1] = curlun->removable ? 0x80 : 0;
-	buf[2] = 2;		/* ANSI SCSI level 2 */
+	buf[2] = 4;		/* ANSI SCSI SPC-2 */
 	buf[3] = 2;		/* SCSI-2 INQUIRY data format */
 	buf[4] = 31;		/* Additional length */
 	buf[5] = 0;		/* No special options */
@@ -1370,6 +1463,28 @@ static int do_read_capacity(struct fsg_common *common, struct fsg_buffhd *bh)
 	return 8;
 }
 
+static int do_read_capacity16(struct fsg_common *common, struct fsg_buffhd *bh)
+{
+	struct fsg_lun	*curlun = common->curlun;
+	u64		lba = get_unaligned_be64(&common->cmnd[2]);
+	int		pmi = common->cmnd[14];
+	u8		*buf = (u8 *) bh->buf;
+
+	/* Check the PMI and LBA fields */
+	if (pmi > 1 || (pmi == 0 && lba != (u64) 0)) {
+		curlun->sense_data = SS_INVALID_FIELD_IN_CDB;
+		return -EINVAL;
+	}
+
+	put_unaligned_be64(curlun->num_sectors - 1, &buf[0]);
+						/* Max logical block */
+	put_unaligned_be32(curlun->blksize, &buf[8]);
+						/* Set block length */
+	memset(&buf[12], 0, 20);
+
+	return 32;
+}
+
 static int do_read_header(struct fsg_common *common, struct fsg_buffhd *bh)
 {
 	struct fsg_lun	*curlun = common->curlun;
@@ -1427,7 +1542,6 @@ static int do_mode_sense(struct fsg_common *common, struct fsg_buffhd *bh)
 	u8		*buf0 = buf;
 	int		pc, page_code;
 	int		changeable_values, all_pages;
-	int		valid_page = 0;
 	int		len, limit;
 
 	if ((common->cmnd[1] & ~0x08) != 0) {	/* Mask away DBD */
@@ -1467,7 +1581,6 @@ static int do_mode_sense(struct fsg_common *common, struct fsg_buffhd *bh)
 	 * is the Caching page.
 	 */
 	if (page_code == 0x08 || all_pages) {
-		valid_page = 1;
 		buf[0] = 0x08;		/* Page code */
 		buf[1] = 10;		/* Page length */
 		memset(buf+2, 0, 10);	/* None of the fields are changeable */
@@ -1492,7 +1605,7 @@ static int do_mode_sense(struct fsg_common *common, struct fsg_buffhd *bh)
 	 * isn't too long.
 	 */
 	len = buf - buf0;
-	if (!valid_page || len > limit) {
+	if (len > limit) {
 		curlun->sense_data = SS_INVALID_FIELD_IN_CDB;
 		return -EINVAL;
 	}
@@ -1502,6 +1615,12 @@ static int do_mode_sense(struct fsg_common *common, struct fsg_buffhd *bh)
 		buf0[0] = len - 1;
 	else
 		put_unaligned_be16(len - 2, buf0);
+
+	if (len < common->data_size_from_cmnd) {
+		common->data_size_from_cmnd = len;
+		common->residue = len;
+	}
+
 	return len;
 }
 
@@ -1509,6 +1628,7 @@ static int do_start_stop(struct fsg_common *common)
 {
 	struct fsg_lun	*curlun = common->curlun;
 	int		loej, start;
+	int		rc;
 
 	if (!curlun) {
 		return -EINVAL;
@@ -1529,11 +1649,27 @@ static int do_start_stop(struct fsg_common *common)
 	 * available for use as soon as it is loaded.
 	 */
 	if (start) {
-		if (!fsg_lun_is_open(curlun)) {
-			curlun->sense_data = SS_MEDIUM_NOT_PRESENT;
-			return -EINVAL;
+		if (loej && !fsg_lun_is_open(curlun)) {
+			if (curlun->lun_filename) {
+				up_read(&common->filesem);
+				down_write(&common->filesem);
+				rc = fsg_lun_open(curlun, curlun->lun_filename);
+				up_write(&common->filesem);
+				down_read(&common->filesem);
+				if (!rc) {
+					curlun->unit_attention_data =
+					SS_NOT_READY_TO_READY_TRANSITION;
+				} else {
+					curlun->sense_data =
+						SS_MEDIUM_NOT_PRESENT;
+					return -EINVAL;
+				}
+			} else {
+				curlun->sense_data = SS_MEDIUM_NOT_PRESENT;
+				return -EINVAL;
+			}
+			return 0;
 		}
-		return 0;
 	}
 
 	/* Are we allowed to unload the media? */
@@ -1547,20 +1683,22 @@ static int do_start_stop(struct fsg_common *common)
 		return 0;
 
 	/* Simulate an unload/eject */
-	if (common->ops && common->ops->pre_eject) {
-		int r = common->ops->pre_eject(common, curlun,
-					       curlun - common->luns);
-		if (unlikely(r < 0))
-			return r;
-		else if (r)
-			return 0;
-	}
+	if (fsg_lun_is_open(curlun)) {
+		if (common->ops && common->ops->pre_eject) {
+			int r = common->ops->pre_eject(common, curlun,
+					curlun - common->luns);
+			if (unlikely(r < 0))
+				return r;
+			else if (r)
+				return 0;
+		}
 
-	up_read(&common->filesem);
-	down_write(&common->filesem);
-	fsg_lun_close(curlun);
-	up_write(&common->filesem);
-	down_read(&common->filesem);
+		up_read(&common->filesem);
+		down_write(&common->filesem);
+		fsg_lun_close(curlun);
+		up_write(&common->filesem);
+		down_read(&common->filesem);
+	}
 
 	return common->ops && common->ops->post_eject
 		? min(0, common->ops->post_eject(common, curlun,
@@ -1927,13 +2065,7 @@ static int check_command(struct fsg_common *common, int cmnd_size,
 	if (common->data_size_from_cmnd == 0)
 		data_dir = DATA_DIR_NONE;
 	if (common->data_size < common->data_size_from_cmnd) {
-		/*
-		 * Host data size < Device data size is a phase error.
-		 * Carry out the command, but only transfer as much as
-		 * we are allowed.
-		 */
 		common->data_size_from_cmnd = common->data_size;
-		common->phase_error = 1;
 	}
 	common->residue = common->data_size;
 	common->usb_amount_left = common->data_size;
@@ -2074,7 +2206,7 @@ static int do_scsi_command(struct fsg_common *common)
 	case INQUIRY:
 		common->data_size_from_cmnd = common->cmnd[4];
 		reply = check_command(common, 6, DATA_DIR_TO_HOST,
-				      (1<<4), 0,
+				      (1<<1) | (1<<2) | (3<<3), 0,
 				      "INQUIRY");
 		if (reply == 0)
 			reply = do_inquiry(common, bh);
@@ -2167,6 +2299,15 @@ static int do_scsi_command(struct fsg_common *common)
 				      "READ CAPACITY");
 		if (reply == 0)
 			reply = do_read_capacity(common, bh);
+		break;
+
+	case READ_CAPACITY_16:
+		common->data_size_from_cmnd = 32;
+		reply = check_command(common, 16, DATA_DIR_TO_HOST,
+				(0xff << 2) | (0xf << 10) | (1 << 14), 1,
+				"READ CAPACITY 16");
+		if (reply == 0)
+			reply = do_read_capacity16(common, bh);
 		break;
 
 	case READ_HEADER:
@@ -2850,6 +2991,7 @@ static DEVICE_ATTR(file, 0644, fsg_show_file, fsg_store_file);
 #ifdef CONFIG_USB_MSC_PROFILING
 static DEVICE_ATTR(perf, 0644, fsg_show_perf, fsg_store_perf);
 #endif
+static DEVICE_ATTR(cdrom, 0644, fsg_show_cdrom, fsg_store_cdrom);
 
 /****************************** FSG COMMON ******************************/
 
@@ -2971,6 +3113,9 @@ static struct fsg_common *fsg_common_init(struct fsg_common *common,
 			dev_err(&gadget->dev, "failed to create sysfs entry:"
 				"(dev_attr_perf) error: %d\n", rc);
 #endif
+		rc = device_create_file(&curlun->dev, &dev_attr_cdrom);
+		if (rc)
+			goto error_luns;
 		if (lcfg->filename) {
 			rc = fsg_lun_open(curlun, lcfg->filename);
 			if (rc)
@@ -3017,8 +3162,9 @@ buffhds_first_it:
 		 /* Assume product name dependent on the first LUN */
 		 cfg->product_name ?: (common->luns->cdrom
 				     ? "File-Stor Gadget"
-				     : "File-CD Gadget"),
+				     : "Mass Storage"),
 		 i);
+	strlcpy(common->serial_number, " ", sizeof(common->serial_number));
 
 	/*
 	 * Some peripheral controllers are known not to be able to
@@ -3105,7 +3251,10 @@ static void fsg_common_release(struct kref *ref)
 			device_remove_file(&lun->dev, &dev_attr_nofua);
 			device_remove_file(&lun->dev, &dev_attr_ro);
 			device_remove_file(&lun->dev, &dev_attr_file);
+			device_remove_file(&lun->dev, &dev_attr_cdrom);
 			fsg_lun_close(lun);
+			kfree(lun->lun_filename);
+			lun->lun_filename = NULL;
 			device_unregister(&lun->dev);
 		}
 
@@ -3146,6 +3295,7 @@ static void fsg_unbind(struct usb_configuration *c, struct usb_function *f)
 	usb_free_descriptors(fsg->function.hs_descriptors);
 	usb_free_descriptors(fsg->function.ss_descriptors);
 	kfree(fsg);
+	fsg_strings[FSG_STRING_INTERFACE].id = 0;
 }
 
 static int fsg_bind(struct usb_configuration *c, struct usb_function *f)

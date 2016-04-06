@@ -1139,6 +1139,14 @@ config MACH_FSM9XXX_SURF
 	  chipset based SURF evaluation board and
 	  FFA board.
 
+config MACH_SONY_FALCONSS
+	depends on ARCH_MSM8610
+	bool "Sony Mobile FalconSS"
+	default n
+	help
+	  Support for the SONY Mobile Xperia E1 device.
+	  Based on QCOM MSM8610 chipset.
+
 endmenu
 
 config MSM_STACKED_MEMORY

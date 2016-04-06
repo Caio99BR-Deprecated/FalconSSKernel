@@ -209,7 +209,7 @@ obj-$(CONFIG_VIDEO_IR_I2C)  += ir-kbd-i2c.o
 
 obj-y	+= davinci/
 
-obj-y	+= nmi/nm32x/
+obj-$(CONFIG_MACH_SONY_FALCONSS) += nmi/nm32x/
 
 obj-$(CONFIG_ARCH_OMAP)	+= omap/
 

@@ -72,6 +72,13 @@ static ssize_t power_supply_show_property(struct device *dev,
 	const ptrdiff_t off = attr - power_supply_attrs;
 	union power_supply_propval value;
 
+	psy->get_property(psy, POWER_SUPPLY_PROP_TYPE, &value);
+
+	if (value.intval == 1)
+		psy->type = 4;
+	else if (value.intval == 2)
+		psy->type = 5;
+
 	if (off == POWER_SUPPLY_PROP_TYPE)
 		value.intval = psy->type;
 	else

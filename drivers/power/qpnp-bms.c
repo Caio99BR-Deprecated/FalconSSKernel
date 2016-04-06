@@ -95,6 +95,9 @@
 
 #define QPNP_BMS_DEV_NAME "qcom,qpnp-bms"
 
+extern int maintenance_soc_flag;
+extern int charging_on_flag;
+
 enum {
 	SHDW_CC,
 	CC
@@ -2500,9 +2503,14 @@ static int calculate_soc_from_voltage(struct qpnp_bms_chip *chip)
 		pr_err("adc vbat failed err = %d\n", rc);
 		return rc;
 	}
-	voltage_range_uv = chip->max_voltage_uv - chip->v_cutoff_uv;
-	voltage_remaining_uv = vbat_uv - chip->v_cutoff_uv;
-	voltage_based_soc = voltage_remaining_uv * 100 / voltage_range_uv;
+	if (0) {
+		voltage_range_uv = chip->max_voltage_uv - chip->v_cutoff_uv;
+		voltage_remaining_uv = vbat_uv - chip->v_cutoff_uv;
+		voltage_based_soc = voltage_remaining_uv * 100 / voltage_range_uv;
+	} else {
+		voltage_based_soc = interpolate_pc(chip->pc_temp_ocv_lut, 25, vbat_uv / 1000);
+		pr_debug("vbat used = %duv\n", vbat_uv);
+	}
 
 	voltage_based_soc = clamp(voltage_based_soc, 0, 100);
 
@@ -3270,6 +3278,7 @@ static void charging_ended(struct qpnp_bms_chip *chip)
 static void battery_status_check(struct qpnp_bms_chip *chip)
 {
 	int status = get_battery_status(chip);
+	int rc, vbat_uv;
 
 	mutex_lock(&chip->status_lock);
 	if (chip->battery_status != status) {
@@ -3285,6 +3294,12 @@ static void battery_status_check(struct qpnp_bms_chip *chip)
 		}
 
 		if (status == POWER_SUPPLY_STATUS_FULL) {
+			if (0) {
+				if (maintenance_soc_flag == 1) {
+					chip->use_voltage_soc = maintenance_soc_flag;
+					pr_debug("Enter maintenance = %d \n",maintenance_soc_flag);
+				}
+			}
 			pr_debug("battery full\n");
 			recalculate_soc(chip);
 		} else if (chip->battery_status
@@ -3294,6 +3309,19 @@ static void battery_status_check(struct qpnp_bms_chip *chip)
 			disable_bms_irq(&chip->sw_cc_thr_irq);
 		}
 
+		if (0) {
+			if((charging_on_flag == 0) && (maintenance_soc_flag == 1)) {
+				if ((chip->battery_status == POWER_SUPPLY_STATUS_FULL)&&(status == POWER_SUPPLY_STATUS_DISCHARGING)) {
+					pr_debug("USB OFF after maintenance\n");
+					if (0) {
+						rc = reset_bms_for_test(chip);
+						chip->last_ocv_uv = get_battery_voltage(chip, &vbat_uv);
+					}
+					maintenance_soc_flag = 0;
+					chip->use_voltage_soc = maintenance_soc_flag;
+				}
+			}
+		}
 		chip->battery_status = status;
 		/* battery charge status has changed, so force a soc
 		 * recalculation to update the SoC */
@@ -3622,6 +3650,8 @@ static int set_battery_data(struct qpnp_bms_chip *chip)
 		batt_data = &QRD_4v35_2000mAh_data;
 	} else if (chip->batt_type == BATT_QRD_4V2_1300MAH) {
 		batt_data = &qrd_4v2_1300mah_data;
+	} else if (chip->batt_type == BATT_QRD_ARIMA_1700MAH) {
+		batt_data = &Arima_Falcon_1700mAh_data;
 	} else {
 		battery_id = read_battery_id(chip);
 		if (battery_id < 0) {

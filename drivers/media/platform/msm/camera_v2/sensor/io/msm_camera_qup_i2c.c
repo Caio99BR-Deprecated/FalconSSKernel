@@ -476,7 +476,7 @@ int32_t msm_camera_qup_i2c_write_conf_tbl(
 	enum msm_camera_i2c_data_type data_type)
 {
 	int i;
-	int32_t rc = -EFAULT;
+	int32_t rc = 0;
 	pr_err("%s, E. ", __func__);
 	for (i = 0; i < size; i++) {
 		enum msm_camera_i2c_data_type dt;

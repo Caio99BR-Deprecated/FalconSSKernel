@@ -2708,6 +2708,10 @@ static irqreturn_t smsm_irq_handler(int irq, void *data)
 				flush_cache_all();
 				outer_flush_all();
 			}
+			{
+				extern void last_radio_log_write(void);
+				last_radio_log_write();
+			}
 			modem_queue_start_reset_notify();
 
 		} else if (modm & SMSM_INIT) {

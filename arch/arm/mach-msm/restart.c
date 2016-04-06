@@ -38,6 +38,10 @@
 #include "timer.h"
 #include "wdog_debug.h"
 
+#include <linux/proc_fs.h>
+#include <linux/string.h>
+#include <linux/uaccess.h>
+
 #define WDT0_RST	0x38
 #define WDT0_EN		0x40
 #define WDT0_BARK_TIME	0x4C
@@ -65,6 +69,12 @@ void *restart_reason;
 
 int pmic_reset_irq;
 static void __iomem *msm_tmr0_base;
+
+static int crash_status = 0;
+
+#define CRASH_STATUS_BUF_SIZE 2
+
+static char crash_status_buf[CRASH_STATUS_BUF_SIZE+1];
 
 #ifdef CONFIG_MSM_DLOAD_MODE
 static int in_panic;
@@ -275,7 +285,9 @@ static void msm_restart_prepare(const char *cmd)
 	else
 		qpnp_pon_system_pwr_off(PON_POWER_OFF_HARD_RESET);
 
-	if (cmd != NULL) {
+	if (in_panic) {
+		__raw_writel(0xc0dedead, restart_reason);
+	} else if (cmd != NULL) {
 		if (!strncmp(cmd, "bootloader", 10)) {
 			__raw_writel(0x77665500, restart_reason);
 		} else if (!strncmp(cmd, "recovery", 8)) {
@@ -286,6 +298,8 @@ static void msm_restart_prepare(const char *cmd)
 			unsigned long code;
 			code = simple_strtoul(cmd + 4, NULL, 16) & 0xff;
 			__raw_writel(0x6f656d00 | code, restart_reason);
+		} else if (!strncmp(cmd, "oemF", 4)) {
+			__raw_writel(0x6f656d46, restart_reason);
 		} else if (!strncmp(cmd, "edl", 3)) {
 			enable_emergency_dload_mode();
 		} else {
@@ -329,9 +343,54 @@ void msm_restart(char mode, const char *cmd)
 	printk(KERN_ERR "Restarting has failed\n");
 }
 
+void msm_set_crash_status(int status)
+{
+	crash_status = status;
+}
+EXPORT_SYMBOL(msm_set_crash_status);
+
+static ssize_t crash_status_read(struct file *file, char __user *buf, size_t len, loff_t *offset)
+{
+	loff_t pos = *offset;
+	ssize_t count;
+	size_t max = CRASH_STATUS_BUF_SIZE;
+
+	if (pos >= CRASH_STATUS_BUF_SIZE)
+		return 0;
+
+	count = min(len, max);
+	memset(crash_status_buf, 0, sizeof(crash_status_buf));
+
+	if ((msm_get_crash_status() == 1) || (crash_status == 1)) {
+		snprintf(crash_status_buf, sizeof(crash_status_buf), "1\n");
+	} else {
+		snprintf(crash_status_buf, sizeof(crash_status_buf), "0\n");
+	}
+
+	if (copy_to_user(buf, crash_status_buf, count))
+		return -EFAULT;
+
+	*offset += count;
+	return count;
+}
+
+static const struct file_operations crash_status_file_ops = {
+	.owner = THIS_MODULE,
+	.read = crash_status_read,
+};
+
 static int __init msm_pmic_restart_init(void)
 {
 	int rc;
+
+	struct proc_dir_entry *entry;
+
+	entry = create_proc_entry("crash_status", S_IFREG | S_IRUGO, NULL);
+	if (!entry) {
+		pr_err("crash_status: failed to create proc entry\n");
+		return 0;
+	}
+	entry->proc_fops = &crash_status_file_ops;
 
 	if (use_restart_v2())
 		return 0;

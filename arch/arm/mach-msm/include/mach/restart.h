@@ -28,5 +28,8 @@ void fsm_restart(char mode, const char *cmd);
 
 extern int pmic_reset_irq;
 
+extern void msm_set_crash_status(int status);
+extern int msm_get_crash_status(void);
+
 #endif
 

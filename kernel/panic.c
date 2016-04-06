@@ -24,9 +24,36 @@
 #include <linux/nmi.h>
 #include <linux/dmi.h>
 #include <linux/coresight.h>
+#include <linux/rtc.h>
+#include <linux/time.h>
+
+#ifndef CONFIG_KEXEC
+#include <linux/elf.h>
+#include <linux/elfcore.h>
+#endif /* CONFIG_KEXEC */
 
 #define PANIC_TIMER_STEP 100
 #define PANIC_BLINK_SPD 18
+
+#ifndef CONFIG_KEXEC
+#define KEXEC_NOTE_HEAD_BYTES ALIGN(sizeof(struct elf_note), 4)
+#define KEXEC_CORE_NOTE_NAME "CORE"
+#define KEXEC_CORE_NOTE_NAME_BYTES ALIGN(sizeof(KEXEC_CORE_NOTE_NAME), 4)
+#define KEXEC_CORE_NOTE_DESC_BYTES ALIGN(sizeof(struct elf_prstatus), 4)
+/*
+ * The per-cpu notes area is a list of notes terminated by a "NULL"
+ * note header.  For kdump, the code in vmcore.c runs in the context
+ * of the second kernel to combine them into one note.
+ */
+#ifndef KEXEC_NOTE_BYTES
+#define KEXEC_NOTE_BYTES ( (KEXEC_NOTE_HEAD_BYTES * 2) +		\
+			    KEXEC_CORE_NOTE_NAME_BYTES +		\
+			    KEXEC_CORE_NOTE_DESC_BYTES )
+#endif
+typedef u32 note_buf_t[KEXEC_NOTE_BYTES/4];
+/* Per cpu memory for storing cpu states in case of system crash. */
+note_buf_t __percpu *crash_notes;
+#endif /* CONFIG_KEXEC */
 
 /* Machine specific panic information string */
 char *mach_panic_string;
@@ -46,6 +73,109 @@ EXPORT_SYMBOL_GPL(panic_timeout);
 ATOMIC_NOTIFIER_HEAD(panic_notifier_list);
 
 EXPORT_SYMBOL(panic_notifier_list);
+
+#ifndef CONFIG_KEXEC
+static u32 *append_elf_note(u32 *buf, char *name, unsigned type, void *data,
+			    size_t data_len)
+{
+	struct elf_note note;
+
+	note.n_namesz = strlen(name) + 1;
+	note.n_descsz = data_len;
+	note.n_type   = type;
+	memcpy(buf, &note, sizeof(note));
+	buf += (sizeof(note) + 3)/4;
+	memcpy(buf, name, note.n_namesz);
+	buf += (note.n_namesz + 3)/4;
+	memcpy(buf, data, note.n_descsz);
+	buf += (note.n_descsz + 3)/4;
+
+	return buf;
+}
+
+static void final_note(u32 *buf)
+{
+	struct elf_note note;
+
+	note.n_namesz = 0;
+	note.n_descsz = 0;
+	note.n_type   = 0;
+	memcpy(buf, &note, sizeof(note));
+}
+
+static void panic_setup_regs(struct pt_regs *newregs,
+				    struct pt_regs *oldregs)
+{
+	if (oldregs) {
+		memcpy(newregs, oldregs, sizeof(*newregs));
+	} else {
+		__asm__ __volatile__ (
+			"stmia	%[regs_base], {r0-r12}\n\t"
+			"mov	%[_ARM_sp], sp\n\t"
+			"str	lr, %[_ARM_lr]\n\t"
+			"adr	%[_ARM_pc], 1f\n\t"
+			"mrs	%[_ARM_cpsr], cpsr\n\t"
+		"1:"
+			: [_ARM_pc] "=r" (newregs->ARM_pc),
+			  [_ARM_cpsr] "=r" (newregs->ARM_cpsr),
+			  [_ARM_sp] "=r" (newregs->ARM_sp),
+			  [_ARM_lr] "=o" (newregs->ARM_lr)
+			: [regs_base] "r" (&newregs->ARM_r0)
+			: "memory"
+		);
+	}
+}
+
+void panic_save_crash_notes(void)
+{
+	int cpu;
+	struct pt_regs regs;
+	struct elf_prstatus prstatus;
+	u32 *buf;
+
+	/* Allocate memory for saving cpu registers. */
+	crash_notes = alloc_percpu(note_buf_t);
+	if (!crash_notes) {
+		printk("panic: Memory allocation for saving cpu register"
+		" states failed\n");
+		return;
+	}
+
+	cpu = smp_processor_id();
+	if ((cpu < 0) || (cpu >= nr_cpu_ids))
+		return;
+
+	panic_setup_regs(&regs, NULL);
+
+	/* Using ELF notes here is opportunistic.
+	 * I need a well defined structure format
+	 * for the data I pass, and I need tags
+	 * on the data to indicate what information I have
+	 * squirrelled away.  ELF notes happen to provide
+	 * all of that, so there is no need to invent something new.
+	 */
+	buf = (u32*)per_cpu_ptr(crash_notes, cpu);
+	if (!buf)
+		return;
+	memset(&prstatus, 0, sizeof(prstatus));
+	prstatus.pr_pid = current->pid;
+	elf_core_copy_kernel_regs(&prstatus.pr_reg, &regs);
+	buf = append_elf_note(buf, "CORE", NT_PRSTATUS,
+		            &prstatus, sizeof(prstatus));
+	final_note(buf);
+}
+#endif /* CONFIG_KEXEC */
+
+static struct rtc_time get_timestamp(void)
+{
+	struct timespec ts;
+	struct rtc_time tm = {0};
+
+	getnstimeofday(&ts);
+	rtc_time_to_tm(ts.tv_sec, &tm);
+
+	return tm;
+}
 
 static long no_blink(int state)
 {
@@ -81,6 +211,8 @@ void panic(const char *fmt, ...)
 	long i, i_next = 0;
 	int state = 0;
 
+	struct rtc_time tm = get_timestamp();
+
 	coresight_abort();
 	/*
 	 * Disable local interrupts. This will prevent panic_smp_self_stop
@@ -109,6 +241,11 @@ void panic(const char *fmt, ...)
 	vsnprintf(buf, sizeof(buf), fmt, args);
 	va_end(args);
 	printk(KERN_EMERG "Kernel panic - not syncing: %s\n",buf);
+
+	printk(KERN_EMERG "Time of panic (m-d-y h:m:s): "
+		"%02d-%02d-%d %02d:%02d:%02d\n",
+		tm.tm_mon + 1, tm.tm_mday, tm.tm_year + 1900,
+		tm.tm_hour, tm.tm_min, tm.tm_sec);
 #ifdef CONFIG_DEBUG_BUGVERBOSE
 	/*
 	 * Avoid nested stack-dumping if a panic occurs during oops processing
@@ -125,6 +262,10 @@ void panic(const char *fmt, ...)
 	crash_kexec(NULL);
 
 	kmsg_dump(KMSG_DUMP_PANIC);
+
+	#ifndef CONFIG_KEXEC
+	panic_save_crash_notes();
+	#endif /* CONFIG_KEXEC */
 
 	/*
 	 * Note smp_send_stop is the usual smp shutdown function, which

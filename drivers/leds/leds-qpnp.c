@@ -727,10 +727,17 @@ static int qpnp_mpp_set(struct qpnp_led_data *led)
 		if (led->mpp_cfg->pwm_mode != MANUAL_MODE)
 			pwm_enable(led->mpp_cfg->pwm_cfg->pwm_dev);
 		else {
-			if (led->cdev.brightness < LED_MPP_CURRENT_MIN)
-				led->cdev.brightness = LED_MPP_CURRENT_MIN;
+			if (led->mpp_cfg->current_setting < LED_MPP_CURRENT_MIN)
+				led->mpp_cfg->current_setting = LED_MPP_CURRENT_MIN;
 
-			val = (led->cdev.brightness / LED_MPP_CURRENT_MIN) - 1;
+			if (led->cdev.brightness == 200)
+				led->mpp_cfg->current_setting = 15;
+			else
+				led->mpp_cfg->current_setting = 5;
+
+			val = (led->mpp_cfg->current_setting / LED_MPP_CURRENT_MIN) - 1;
+			printk(KERN_INFO"tracy: green led brightness: %d, green led current: %d\n",
+				led->cdev.brightness, led->mpp_cfg->current_setting);
 
 			rc = qpnp_led_masked_write(led,
 					LED_MPP_SINK_CTRL(led->base),
@@ -1453,7 +1460,7 @@ static int __devinit qpnp_led_set_max_brightness(struct qpnp_led_data *led)
 		break;
 	case QPNP_ID_LED_MPP:
 		if (led->mpp_cfg->pwm_mode == MANUAL_MODE)
-			led->cdev.max_brightness = led->max_current;
+			led->cdev.max_brightness = MPP_MAX_LEVEL;
 		else
 			led->cdev.max_brightness = MPP_MAX_LEVEL;
 		break;

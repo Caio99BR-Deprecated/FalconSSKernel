@@ -297,6 +297,9 @@ static inline int bad_range(struct zone *zone, struct page *page)
 }
 #endif
 
+unsigned int badpage_cnt = 0;
+EXPORT_SYMBOL(badpage_cnt);
+
 static void bad_page(struct page *page)
 {
 	static unsigned long resume;
@@ -328,6 +331,8 @@ static void bad_page(struct page *page)
 	}
 	if (nr_shown++ == 0)
 		resume = jiffies + 60 * HZ;
+
+	badpage_cnt++;
 
 	printk(KERN_ALERT "BUG: Bad page state in process %s  pfn:%05lx\n",
 		current->comm, page_to_pfn(page));

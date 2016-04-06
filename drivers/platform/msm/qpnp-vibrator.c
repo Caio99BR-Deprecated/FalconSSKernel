@@ -145,6 +145,14 @@ static int qpnp_vib_set(struct qpnp_vib *vib, int on)
 			return rc;
 		vib->reg_en_ctl = val;
 	} else {
+
+		val = 0;
+		val &= ~QPNP_VIB_VTG_SET_MASK;
+		val |= (vib->vtg_level & QPNP_VIB_VTG_SET_MASK);
+		rc = qpnp_vib_write_u8(vib, &val, QPNP_VIB_VTG_CTL(vib->base));
+		if (rc < 0)
+			return rc;
+
 		val = vib->reg_en_ctl;
 		val &= ~QPNP_VIB_EN;
 		rc = qpnp_vib_write_u8(vib, &val, QPNP_VIB_EN_CTL(vib->base));

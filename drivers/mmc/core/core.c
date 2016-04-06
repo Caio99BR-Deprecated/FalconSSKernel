@@ -1342,6 +1342,7 @@ void mmc_set_data_timeout(struct mmc_data *data, const struct mmc_card *card)
 		if (data->timeout_ns <  4000000000u)
 			data->timeout_ns = 4000000000u;	/* 4s */
 	}
+	data->timeout_ns <<= 1;
 }
 EXPORT_SYMBOL(mmc_set_data_timeout);
 

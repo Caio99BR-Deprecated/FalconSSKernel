@@ -385,6 +385,7 @@ static char *cpio_replace_env(char *new_location)
        char env_var[PATH_MAX + 1];
        char *start;
        char *end;
+       char *env_val;
 
        for (start = NULL; (start = strstr(new_location, "${")); ) {
                end = strchr(start, '}');
@@ -392,7 +393,9 @@ static char *cpio_replace_env(char *new_location)
                        *env_var = *expanded = '\0';
                        strncat(env_var, start + 2, end - start - 2);
                        strncat(expanded, new_location, start - new_location);
-                       strncat(expanded, getenv(env_var), PATH_MAX);
+                       env_val = getenv(env_var);
+                       if (NULL != env_val)
+                           strncat(expanded, env_val, PATH_MAX);
                        strncat(expanded, end + 1, PATH_MAX);
                        strncpy(new_location, expanded, PATH_MAX);
                } else

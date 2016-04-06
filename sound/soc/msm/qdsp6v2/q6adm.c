@@ -1143,7 +1143,7 @@ int adm_open(int port_id, int path, int rate, int channel_mode, int topology,
 		open.hdr.token = port_id;
 		open.hdr.opcode = ADM_CMD_DEVICE_OPEN_V5;
 		if (perf_mode == ULTRA_LOW_LATENCY_PCM_MODE)
-			open.flags = ADM_ULTRA_LOW_LATENCY_DEVICE_SESSION;
+			open.flags = ADM_LOW_LATENCY_DEVICE_SESSION;
 		else if (perf_mode == LOW_LATENCY_PCM_MODE)
 			open.flags = ADM_LOW_LATENCY_DEVICE_SESSION;
 		else

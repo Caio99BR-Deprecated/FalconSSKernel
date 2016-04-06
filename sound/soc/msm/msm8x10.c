@@ -41,7 +41,7 @@
 #define EXT_CLASS_D_DELAY_DELTA 2000
 
 #define CDC_EXT_CLK_RATE 9600000
-#define WCD9XXX_MBHC_DEF_BUTTONS 8
+#define WCD9XXX_MBHC_DEF_BUTTONS 5
 #define WCD9XXX_MBHC_DEF_RLOADS 5
 
 static int msm_btsco_rate = BTSCO_RATE_8KHZ;
@@ -101,9 +101,7 @@ static struct wcd9xxx_mbhc_config mbhc_cfg = {
 	.use_int_rbias = false,
 	.micbias_enable_flags = 1 << MBHC_MICBIAS_ENABLE_THRESHOLD_HEADSET |
 				1 << MBHC_MICBIAS_ENABLE_REGULAR_HEADSET,
-	.cs_enable_flags = (1 << MBHC_CS_ENABLE_POLLING |
-			    1 << MBHC_CS_ENABLE_INSERTION |
-			    1 << MBHC_CS_ENABLE_REMOVAL),
+	.cs_enable_flags = 0,
 	.do_recalibration = false,
 	.use_vddio_meas = false,
 };
@@ -592,7 +590,7 @@ static void *def_msm8x10_wcd_mbhc_cal(void)
 #undef S
 #define S(X, Y) ((WCD9XXX_MBHC_CAL_PLUG_TYPE_PTR(msm8x10_wcd_cal)->X) = (Y))
 	S(v_no_mic, 30);
-	S(v_hs_max, 2550);
+	S(v_hs_max, 2475);
 #undef S
 #define S(X, Y) ((WCD9XXX_MBHC_CAL_BTN_DET_PTR(msm8x10_wcd_cal)->X) = (Y))
 	S(c[0], 62);
@@ -611,21 +609,15 @@ static void *def_msm8x10_wcd_mbhc_cal(void)
 	btn_high = wcd9xxx_mbhc_cal_btn_det_mp(btn_cfg,
 					       MBHC_BTN_DET_V_BTN_HIGH);
 	btn_low[0] = -50;
-	btn_high[0] = 20;
-	btn_low[1] = 21;
-	btn_high[1] = 61;
-	btn_low[2] = 62;
-	btn_high[2] = 104;
-	btn_low[3] = 105;
-	btn_high[3] = 148;
-	btn_low[4] = 149;
-	btn_high[4] = 189;
-	btn_low[5] = 190;
-	btn_high[5] = 228;
-	btn_low[6] = 229;
-	btn_high[6] = 269;
-	btn_low[7] = 270;
-	btn_high[7] = 500;
+	btn_high[0] = 100;
+	btn_low[1] = 101;
+	btn_high[1] = 375;
+	btn_low[2] = 376;
+	btn_high[2] = 750;
+	btn_low[3] = 751;
+	btn_high[3] = 1500;
+	btn_low[4] = 1501;
+	btn_high[4] = 1502;
 	n_ready = wcd9xxx_mbhc_cal_btn_det_mp(btn_cfg, MBHC_BTN_DET_N_READY);
 	n_ready[0] = 80;
 	n_ready[1] = 68;

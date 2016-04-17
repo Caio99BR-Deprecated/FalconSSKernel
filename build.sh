@@ -14,7 +14,7 @@
 
 maindevice() {
 echo
-defconfig="cyanogenmod_falconss_defconfig"
+defconfig="stock_falconss_defconfig"
 name="XperiaE1"
 make $defconfig &> /dev/null | echo "$x - $name, setting..."
 unset buildprocesscheck zippackagecheck defconfigcheck

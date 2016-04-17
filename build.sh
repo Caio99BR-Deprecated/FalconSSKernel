@@ -111,14 +111,13 @@ if [ -f .config ]; then
 	echo "1) Default Linux Kernel format  | Small"
 	echo "2) Usual copy of .config format | Complete"
 	echo
-	echo "e) Exit"
+	echo "*) Any other key to Exit"
 	echo
 	read -p "Choice: " -n 1 -s x
 	case "$x" in
 		1 ) echo "Wait..."; make savedefconfig &>/dev/null; mv defconfig arch/$ARCH/configs/$defconfig;;
 		2 ) cp .config arch/$ARCH/configs/$defconfig;;
-		e ) ;;
-		* ) ops;;
+		* ) ;;
 	esac
 else
 	ops
@@ -166,7 +165,8 @@ if ! [ "$defconfig" == "" ]; then
 		rm -rf $zipdirout/tempramdisk
 
 		echo "${name}" >> $zipdirout/device.prop
-		echo "${release}" >> $zipdirout/device.prop
+		echo "${Release}" >> $zipdirout/device.prop
+		echo "${revision}" >> $zipdirout/device.prop
 
 		mkdir $zipdirout/modules
 		find . -name *.ko | xargs cp -a --target-directory=$zipdirout/modules/ &> /dev/null
@@ -201,14 +201,13 @@ if [ -f zip-creator/$zipfile ]; then
 	echo "i) For Internal"
 	echo "e) For External"
 	echo
-	echo "q) Exit"
+	echo "*) Any other key to Exit"
 	echo
 	read -p "Choice: " -n 1 -s x
 	case "$x" in
 		i ) echo "Coping to Internal Card..."; adb shell rm -rf /storage/sdcard0/$zipfile &> /dev/null; adb push zip-creator/$zipfile /storage/sdcard0/$zipfile &> /dev/null;;
 		e ) echo "Coping to External Card..."; adb shell rm -rf /storage/sdcard1/$zipfile &> /dev/null; adb push zip-creator/$zipfile /storage/sdcard1/$zipfile &> /dev/null;;
-		q ) ;;
-		* ) ops;;
+		* ) ;;
 	esac
 else
 	ops
@@ -216,6 +215,47 @@ fi
 }
 
 # ADB - End
+
+# TAG Uploader - Start
+
+tagupload() {
+clear
+echo "-Pushing tag-"
+echo
+echo "Delete local and remote tag with same name if have one"
+echo "And create and push new tag"
+echo
+if [ -f .travis.yml ]; then
+	echo "This is integration on Travis CI"
+	echo "Just to make upload and build trigger more easy"
+	echo
+fi
+echo "TAG to upload in 'origin': $build"
+echo
+echo "y) If you want to continue"
+echo
+echo "*) Any other key to Exit"
+echo
+read -p "Choice: " -n 1 -s x
+case $x in
+	"y") echo
+	echo "Deleting local TAG, if have one"
+	git tag -d $build
+	echo "Deleting Remote TAG, if have one"
+	if ! [ -f ~/.git-credentials ]
+		then git config credential.helper 'cache --timeout=300'
+	fi
+	git push --delete origin $build
+	echo
+	echo "Creating new local TAG"
+	git tag $build
+	echo "Pushing new local TAG to Remote"
+	git push origin --tags
+	sleep 3
+esac
+}
+
+# TAG Uploader - End
 
 # Menu - Start
 
@@ -242,8 +282,9 @@ echo "-${bldblu}Special Menu${txtrst}-"
 echo "7) Update Defconfig                          | ${bldblu}$defconfigcheck${txtrst}"
 echo "8) Copy Latest Build Zip to device - Via Adb | ${bldblu}$zipcopycheck${txtrst}"
 echo "9) Reboot device to recovery"
+echo "t) Git Push TAG"
 echo "-${bldmag}Options${txtrst}-"
-echo "o) View Build Output | $buildoutput"
+echo "o) View Build Output | $buildoutput | z) Local testing | $localoutput"
 echo "g) Git Gui  |  k) GitK  |  s) Git Push  |  l) Git Pull"
 echo "q) Quit"
 echo
@@ -258,7 +299,9 @@ case $x in
 	7) updatedefconfig;;
 	8) adbcopy;;
 	9) echo "$x - Rebooting to Recovery..."; adb reboot recovery;;
+	t) tagupload;;
 	o) if [ "$buildoutput" == "OFF" ]; then unset buildoutput; else buildoutput="OFF"; fi;;
+	z) if [ "$localoutput" == "OFF" ]; then localoutput="${bldmag}ON${txtrst}"; else localoutput="OFF"; fi;;
 	q) echo "$x - Ok, Bye!"; break;;
 	g) echo "$x - Opening Git Gui"; git gui;;
 	k) echo "$x - Opening GitK"; gitk;;
@@ -291,7 +334,7 @@ elif [ -e build.sh ]; then
 	bldcya=${txtbld}$(tput setaf 6) # cyan
 	bldwhi=${txtbld}$(tput setaf 7) # white
 
-	customkernel=CAFKernel
+	customkernel=FalconSSKernel
 	export ARCH=arm
 
 	while true; do
@@ -330,16 +373,24 @@ elif [ -e build.sh ]; then
 			then unset cleankernelcheck
 			else cleankernelcheck="Already Done!"
 		fi
-		if [ -f .version ]
-			then build=$(cat .version)
-			else build="0"
+		Release=0
+		revision=3
+		build=R${Release}r${revision}
+		if [ "$localoutput" == "" ]
+		then
+			localoutput="OFF"
+		fi
+		if ! [ "$localoutput" == "OFF" ]
+		then
+			build=$(cat .version)-$build
+			localoutput="${bldmag}ON${txtrst}"
 		fi
 		kernelversion=`cat Makefile | grep VERSION | cut -c 11- | head -1`
 		kernelpatchlevel=`cat Makefile | grep PATCHLEVEL | cut -c 14- | head -1`
 		kernelsublevel=`cat Makefile | grep SUBLEVEL | cut -c 12- | head -1`
 		kernelname=`cat Makefile | grep NAME | cut -c 8- | head -1`
 		release=$(date +%d""%m""%Y)
-		zipfile="$customkernel-$name-$variant-$release-$build.zip"
+		export zipfile="$customkernel-$name-$release-$build.zip"
 
 		buildsh
 	done

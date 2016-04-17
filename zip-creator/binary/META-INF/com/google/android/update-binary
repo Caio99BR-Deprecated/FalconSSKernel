@@ -21,17 +21,18 @@ unzip "${zipfile}"
 
 name="$(sed -n '1p' /tmp/kernel/device.prop)"
 release="$(sed -n '2p' /tmp/kernel/device.prop)"
+revision="$(sed -n '3p' /tmp/kernel/device.prop)"
 
 ui_print "Caio99BR Presents"
-ui_print "CAFKernel"
+ui_print "FalconSSKernel"
 ui_print "For ${name}"
-ui_print "Release ${release}"
+ui_print "Release ${release} revision ${revision}"
 
 if [ `mount | grep /system | wc -l` -ge 1 ]; then SUSER="true"; fi
 if [ `mount | grep /data | wc -l` -ge 1 ]; then DUSER="true"; fi
 
-if [ "$SUSER" == "true" ]; then umount /system; ui_print "Desmounting /system"; fi
-if [ "$DUSER" == "true" ]; then umount /data; ui_print "Desmounting /data"; fi
+if [ "$SUSER" == "true" ]; then umount /system; ui_print "Desmounting /system previous mounted"; fi
+if [ "$DUSER" == "true" ]; then umount /data; ui_print "Desmounting /data previous mounted"; fi
 
 mount /system
 mount /data
@@ -53,14 +54,14 @@ busybox chmod 644 /system/etc/firmware/wlan/prima/WCNSS_cfg.dat
 cp /tmp/kernel/wifi/WCNSS_qcom_* /data/misc/wifi/WCNSS_qcom_*
 busybox chmod 660 /data/misc/wifi/WCNSS_qcom_*
 
-ui_print "Flashing Falcon SS Custom Kernel!"
+ui_print "Flashing FalconSSKernel!"
 dd if=/tmp/kernel/boot.img of=/dev/block/platform/msm_sdcc.1/by-name/boot
 
 umount /system
 umount /data
 
-if [ "$SUSER" == "true" ]; then mount /system; ui_print "Remounting /system"; fi
-if [ "$DUSER" == "true" ]; then mount /data; ui_print "Remounting /data"; fi
+if [ "$SUSER" == "true" ]; then mount /system; ui_print "Remounting /system previous mounted"; fi
+if [ "$DUSER" == "true" ]; then mount /data; ui_print "Remounting /data previous mounted"; fi
 
 END=$(date +"%s")
 BUILDTIME=$(($END - $START))

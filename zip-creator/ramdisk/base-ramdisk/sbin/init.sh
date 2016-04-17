@@ -59,7 +59,10 @@ then
 	# trigger ON cyan LED for recoveryboot
 	triggerled 0 255 255 65535
 	# recovery ramdisk
-	extract_elf_ramdisk -i ${BOOTREC_FOTA} -o /sbin/ramdisk-recovery.cpio -t / -c
+	if busybox grep -q warmboot=0x77665502 /proc/cmdline
+	then
+		extract_elf_ramdisk -i ${BOOTREC_FOTA} -o /sbin/ramdisk-recovery.cpio -t / -c
+	fi
 	load_image="/sbin/ramdisk-recovery.cpio"
 else
 	busybox echo "ANDROID BOOT" >> boot.txt

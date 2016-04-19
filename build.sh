@@ -58,6 +58,12 @@ buildprocess() {
 if [ -f .config ]; then
 	echo "$x - Building $customkernel"
 
+	if ! which lz4c > /dev/null
+	then
+		echo "We need LZ4 support on machine, lets install it"
+		sudo apt-get install liblz4-tool
+	fi
+
 	if [ -f arch/$ARCH/boot/zImage ]
 		then rm -rf arch/$ARCH/boot/zImage | echo "Removing old kernel image before build"
 	fi

@@ -1,6 +1,8 @@
 sudo: required
 language: c
 script:
+- sudo add-apt-repository ppa:nathan-renniewaldock/ppa -y
+- sudo apt-get update
 - export ntoolchainbranch="google_gcc"
 - export ntoolchainchoice="1"
 - git clone -b "${ntoolchainbranch}" "https://github.com/TeamVee/android_prebuilt_toolchains" "../android_prebuilt_toolchains"

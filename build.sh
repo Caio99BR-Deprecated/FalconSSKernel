@@ -61,7 +61,7 @@ if [ -f .config ]; then
 	if ! which lz4c > /dev/null
 	then
 		echo "We need LZ4 support on machine, lets install it"
-		sudo apt-get install liblz4-tool
+		sudo apt-get install liblz4-tool -y
 	fi
 
 	if [ -f arch/$ARCH/boot/zImage ]

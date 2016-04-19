@@ -1,3 +1,4 @@
+sudo: required
 language: c
 script:
 - export ntoolchainbranch="google_gcc"

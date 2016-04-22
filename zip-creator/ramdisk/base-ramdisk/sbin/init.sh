@@ -49,7 +49,7 @@ busybox cat ${BOOTREC_EVENT} > /dev/keycheck&
 busybox sleep 3
 
 # android ramdisk
-load_image="/sbin/ramdisk.cpio"
+load_image=/sbin/ramdisk.cpio
 
 # boot decision
 if [ -s /dev/keycheck ] || busybox grep -q warmboot=0x77665502 /proc/cmdline
@@ -71,20 +71,8 @@ fi
 # kill the keycheck process
 busybox pkill -f "busybox cat ${BOOTREC_EVENT}"
 
-# copy '/sbin/busybox' to '/sbin/busybox_temp'
-busybox cp /sbin/busybox /sbin/busybox_temp
-
-# remove '/sbin/busybox' if in recovery
-if [ -s /dev/keycheck ] || busybox grep -q warmboot=0x77665502 /proc/cmdline
-then
-	busybox rm -rf /sbin/busybox
-fi
-
 # unpack the ramdisk image
-busybox_temp cpio -i < ${load_image}
-
-# remove the 'busybox_temp'
-busybox rm -rf /sbin/busybox_temp
+busybox cpio -i < ${load_image}
 
 # trigger OFF LED
 triggerled 0 0 0 0

@@ -24,7 +24,7 @@ else
 		else
 			nl=$link.patch
 		fi
-		curl $nl | git am
+		curl -# $nl | git am
 		if [ $? == "0" ]; then
 			echo
 			git log --oneline -n 1
@@ -32,7 +32,7 @@ else
 			echo
 		else
 			echo
-			echo $(tput bold)$(tput setaf 1)"Something not worked good in patch #${#}"
+			echo $(tput bold)$(tput setaf 1)"Something not worked good in patch #${c}"
 			echo "Aborting 'git am' process"
 			if [ ${#} -gt "1" ]; then
 				echo

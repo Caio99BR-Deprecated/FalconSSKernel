@@ -24,22 +24,39 @@ else
 		else
 			nl=$link.patch
 		fi
-		curl -# $nl | git am
-		if [ $? == "0" ]; then
-			echo
-			git log --oneline -n 1
-			echo $(tput bold)$(tput setaf 2)"Patch (${c}/${#})"$(tput sgr0)
-			echo
+		patch_filename="patch.sh-${c}.patch"
+		echo "Downloading..."
+		curl -# -o $patch_filename $nl
+		if [ -f $patch_filename ]
+		then
+			echo "Patching..."
+			git am $patch_filename
+			if [ $? == "0" ]; then
+				echo
+				git log --oneline -n 1
+				echo $(tput bold)$(tput setaf 2)"Patch (${c}/${#})"$(tput sgr0)
+				echo
+			else
+				echo
+				echo $(tput bold)$(tput setaf 1)"Something not worked good in patch #${c}"
+				echo "Aborting 'git am' process"
+				if ! [ "${c}" == "${#}" ]
+				then
+					if [ ${#} -gt "1" ]; then
+						echo
+						echo "Passing to next patch"
+					fi
+				fi
+				echo $(tput sgr0)
+				git am --abort
+			fi
 		else
-			echo
-			echo $(tput bold)$(tput setaf 1)"Something not worked good in patch #${c}"
-			echo "Aborting 'git am' process"
+			echo "Patch not downloaded, check internet or link"
 			if [ ${#} -gt "1" ]; then
 				echo
 				echo "Passing to next patch"
 			fi
-			echo $(tput sgr0)
-			git am --abort
 		fi
+		rm -rf $patch_filename
 	done
 fi

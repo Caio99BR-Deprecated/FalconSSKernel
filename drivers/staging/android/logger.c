@@ -26,7 +26,6 @@
 #include <linux/poll.h>
 #include <linux/slab.h>
 #include <linux/time.h>
-#include <linux/interrupt.h>
 #include "logger.h"
 
 #include <asm/ioctls.h>
@@ -37,7 +36,6 @@
 
 static DEFINE_SPINLOCK(log_lock);
 static struct work_struct write_console_wq;
-static struct tasklet_struct schedule_work_tasklet;
 
 /*
  * struct logger_log - represents a specific log, such as 'main' or 'radio'
@@ -949,11 +947,6 @@ out:
 }
 device_initcall(logger_init);
 
-static void schedule_work_tasklet_func(unsigned long data)
-{
-	schedule_work((struct work_struct *)data);
-}
-
 static void
 logger_console_write(struct console *console, const char *s, unsigned int count)
 {
@@ -963,7 +956,7 @@ logger_console_write(struct console *console, const char *s, unsigned int count)
 
 	if (unlikely(!keventd_up()))
 		return;
-	tasklet_schedule(&schedule_work_tasklet);
+	schedule_work(&write_console_wq);
 }
 
 static struct console logger_console = {
@@ -976,9 +969,6 @@ static struct console logger_console = {
 static int __init logger_console_init(void)
 {
 	INIT_WORK(&write_console_wq, write_console);
-	tasklet_init(&schedule_work_tasklet, schedule_work_tasklet_func,
-			(unsigned long)&write_console_wq);
-
 
 	printk(KERN_INFO "register logcat console\n");
 	register_console(&logger_console);

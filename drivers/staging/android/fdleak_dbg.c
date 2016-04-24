@@ -52,17 +52,15 @@
  */
 static uint32_t fdleak_dbg_bigfd = UINT_MAX;
 
-static int notify_helsmond_of_big_fd(unsigned int fd, pid_t tid, pid_t pid)
+static int notify_helsmond_of_big_fd(unsigned int fd, pid_t tid)
 {
 	char pid_str[12];
-	char tid_str[12];
 	char fd_str[12];
-	char *argv[] = { HELSMON_EXE, "start", "log_bigfd", "-q",
-			 "-p", pid_str, " -t", tid_str, fd_str, NULL };
+	char *argv[] = { HELSMON_EXE, "start", "log_backtrace",
+			 "-p", pid_str, "--big_fd_created", fd_str, NULL };
 	char *envp[] = { NULL };
-	snprintf(pid_str, sizeof(pid_str), "%d", pid);
-	snprintf(tid_str, sizeof(tid_str), "%d", tid);
-	snprintf(fd_str, sizeof(fd_str), "0x%06x", fd);
+	sprintf(pid_str, "%d", tid);
+	sprintf(fd_str, "%d", fd);
 	return call_usermodehelper(argv[0], argv, envp, UMH_WAIT_EXEC);
 }
 
@@ -95,7 +93,6 @@ void warn_if_big_fd(unsigned int fd, struct task_struct *dst_tsk)
 {
 	int sleep_ms;
 	pid_t cur_tid;
-	pid_t dst_pid;
 
 	if ((fd < fdleak_dbg_bigfd) || (current->flags & PF_KTHREAD)) {
 		/* Do nothing if fd is small or not in user-space process */
@@ -104,17 +101,16 @@ void warn_if_big_fd(unsigned int fd, struct task_struct *dst_tsk)
 
 	sleep_ms = 0;
 	cur_tid = task_pid_nr(current);
-	dst_pid = task_tgid_nr(dst_tsk);
+
+	printk(KERN_WARNING "Big fd %d created in thread %d by thread %d\n",
+	       fd, task_pid_nr(dst_tsk), cur_tid);
 
 	if (is_android_exe(current)) {
 		struct siginfo info;
 		info.si_signo = SIGUSR1;
-		/*
-		 * The following 4 fields are severely hacked
-		 */
 		info.si_errno = fd;
 		info.si_code = SI_KERNEL;
-		info.si_uid = (uid_t)dst_pid;
+		info.si_uid = task_uid(current);
 		info.si_pid = cur_tid;
 		/*
 		 * Assume there's at least one thread waiting for
@@ -126,7 +122,7 @@ void warn_if_big_fd(unsigned int fd, struct task_struct *dst_tsk)
 			/* Wait at most 100 milli-seconds */
 			sleep_ms = 100;
 		}
-	} else if (!notify_helsmond_of_big_fd(fd, cur_tid, dst_pid)) {
+	} else if (!notify_helsmond_of_big_fd(fd, cur_tid)) {
 		/* Slower because of added IPC. Use a longer timeout */
 		sleep_ms = 200;
 	}

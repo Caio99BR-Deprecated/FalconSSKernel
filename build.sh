@@ -379,8 +379,8 @@ elif [ -e build.sh ]; then
 			then unset cleankernelcheck
 			else cleankernelcheck="Already Done!"
 		fi
-		Release=4
-		revision=7
+		Release=5
+		revision=8
 		build=R${Release}r${revision}
 		if [ "$localoutput" == "" ]
 		then

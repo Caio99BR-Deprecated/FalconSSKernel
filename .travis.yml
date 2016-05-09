@@ -8,3 +8,11 @@ script:
 - git clone -b "${ntoolchainbranch}" "https://github.com/TeamVee/android_prebuilt_toolchains" "../android_prebuilt_toolchains"
 - export nbasebuildsh="234${ntoolchainchoice}56q"
 - source build.sh <<< "${nbasebuildsh}"
+deploy:
+  provider: releases
+  skip_cleanup: true
+  api_key:
+    secure: E3ubWH7c7xh/vNY7EtAb1u7O9TybYlO7jlo9y/J0AXjq55TyTpaUXEaeP3opwUETixf5imuIcVhG3KOsgPCnQ338Y5J4Tqgm4JDchay3DqMN6w79QapkBrySzvbvVwUIBSj20x7YnOWfwmELHNRX+XQ4SsGrsiHRZSfooFbKNmC08hHa9Psk2i+c/q0Vy+Dv4hkYohCe3a9yu/xfcrE9+GZFxn5T8ou12BtRq0y4lP4sCopMwQrqvFnAoW2BtMNm4Cr+jR3xxJ9NsTd8YSTZpZcPZhEUB9fj2sLio3S8uTJVMPmRRQ/bcWrXZO4d9O2xnN4uWGV4C8PGAk9ycuKM3HZaAKNr9sF7jkkxCcSug1m7hk/b5mCu7fnUEj6UQWld6s3DlimiQ1imRpOy39gbPaiiGQyfGzElAFsCviVQ6+/yxBp/T6YbiL+XX1dcbUXf+C2TXJCtYgoT1v1UP/UQyFWRWUWQvhWSUjaBxUE/zcBzX/2FvVIYXtgEeC4ieLc7zQRE4ZtHTiuz5+fxr9S0QOBkRo23rRBMPq2qOhM4YzNZi8CxMsqCJy984WFVw/5W2h94rviPXylhDWQpHQ5IDrxk7GHzTSO3k9ID8blj9zDLEfvWUZ2shBNBF4fR+oKFTGpzZBw9B0USeUP/0dvs1x6W0ymD1lp3eopHd0iFBWk=
+  file: "zip-creator/${zipfile}"
+  on:
+    tags: true

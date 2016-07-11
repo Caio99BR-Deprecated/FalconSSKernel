@@ -5079,10 +5079,10 @@ static const struct v4l2_ioctl_ops iris_ioctl_ops = {
 
 #ifndef MODULE
 extern int radio_hci_smd_init(void);
-static int iris_fops_open(struct file *f) {
-	if (transport_ready < 0) {
+static int iris_fops_open(struct file *f)
+{
+	if (transport_ready < 0)
 		transport_ready = radio_hci_smd_init();
-	}
 	return transport_ready;
 }
 #endif

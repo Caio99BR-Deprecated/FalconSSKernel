@@ -147,15 +147,17 @@ then
 		cp zip-creator/base/update-binary ${zip_out}/META-INF/com/google/android/
 		cp -R zip-creator/base/base-ramdisk/ ${zip_out}/base-ramdisk/
 
+		# Make android ramdisk
 		cd ${zip_out}/base-ramdisk/sbin/ramdisk
 		find . | cpio -o -H newc > ${zip_out}/base-ramdisk/sbin/ramdisk.cpio
 		cd ${original_dir}
 
+		# Make main ramdisk
 		cd ${zip_out}/base-ramdisk
 		find . | cpio -o -H newc | gzip > ${zip_out}/ramdisk
 		cd ${original_dir}
-		rm -rf ${zip_out}/base-ramdisk
 
+		# Make new boot.img
 		chmod a+x zip-creator/base/mkqcdtbootimg
 		./zip-creator/base/mkqcdtbootimg \
 		--kernel arch/${ARCH}/boot/zImage \
@@ -167,6 +169,9 @@ then
 		--tags_offset 0x01E00000 \
 		--pagesize 2048 \
 		-o ${zip_out}/boot.img &> /dev/null
+
+		# Cleanup
+		rm -rf ${zip_out}/base-ramdisk ${zip_out}/ramdisk
 
 		# Set device
 		echo "${builder}" >> ${zip_out}/device.prop
@@ -288,7 +293,7 @@ then
 		k_sub_level=$(cat Makefile | grep SUBLEVEL | cut -c 12- | head -1)
 		kernel_base="${k_version}.${k_patch_level}.${k_sub_level}"
 		release=$(date +%d""%m""%Y)
-		build=R5r8
+		build=R6-FinalOld
 		export zipfile="${custom_kernel}-${custom_kernel_branch}-${device_name}-${release}-${build}.zip"
 		# Check ZIP
 		if [ -f zip-creator/${zipfile} ]

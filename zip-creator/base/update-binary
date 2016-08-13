@@ -1,0 +1,90 @@
+#!/sbin/sh
+
+# Get values used in original zip
+#interface="${1}"
+updater_fd="${2}"
+zipfile="${3}"
+
+# Set ui_print
+ui_print() {
+	echo -en "ui_print ${1}\n" > /proc/self/fd/"${updater_fd}"
+	echo -en "ui_print \n" > /proc/self/fd/"${updater_fd}"
+}
+
+# Start of main process
+START=$(date +"%s")
+
+# Dirs used
+working_dir="/tmp/kernel"
+original_dir=$(pwd)
+
+# Clean working folder
+rm -rf ${working_dir}/
+mkdir -p ${working_dir}/
+cd ${working_dir}/
+
+# Unzip current zipfile
+unzip "${zipfile}"
+
+# Get device.prop values
+builder=$(sed -n "1p" "${working_dir}/device.prop")
+custom_kernel=$(sed -n "2p" "${working_dir}/device.prop")
+device_name=$(sed -n "3p" "${working_dir}/device.prop")
+release=$(sed -n "4p" "${working_dir}/device.prop")
+
+# Initial Print
+ui_print
+ui_print "${builder} Presents"
+ui_print "${custom_kernel} for ${device_name}"
+ui_print "${release}"
+
+# Set original boot
+boot_partition="/dev/block/platform/msm_sdcc.1/by-name/boot"
+original_boot_image="${working_dir}/boot.img"
+
+# Flash new boot.img
+dd if=${original_boot_image} of=${boot_partition}
+
+# Desmount /system if user NOT mounted it before
+if [ ! $(mount | grep /system | wc -l) -ge 1 ]
+then
+	mount /system
+fi
+
+# Delete all old modules
+rm -rf /system/lib/modules/*
+mkdir -p /system/lib/modules/pronto/
+
+# Copy new wlan module
+cp ${working_dir}/modules/wlan.ko /system/lib/modules/
+mv /system/lib/modules/wlan.ko /system/lib/modules/pronto/pronto_wlan.ko
+ln -s /system/lib/modules/pronto/pronto_wlan.ko /system/lib/modules/wlan.ko
+
+# Add permissions to modules
+chmod 644 /system/lib/modules/wlan.ko /system/lib/modules/pronto/pronto_wlan.ko
+
+# Copy new wifi files
+cp ${working_dir}/wifi/WCNSS_cfg.dat /system/etc/firmware/wlan/prima/
+busybox chmod 644 /system/etc/firmware/wlan/prima/WCNSS_cfg.dat
+
+# Desmount /data if user NOT mounted it before
+if [ ! $(mount | grep /data | wc -l) -ge 1 ]
+then
+	mount /data
+fi
+
+cp ${working_dir}/wifi/WCNSS_qcom_* /data/misc/wifi/WCNSS_qcom_cfg.ini
+busybox chmod 660 /data/misc/wifi/WCNSS_qcom_cfg.ini
+
+# Clean working ${working_dir} folder
+rm -rf ${working_dir}/
+
+# End of work
+BUILDTIME=$(($(date +"%s") - ${START}))
+
+# Go back to original dir
+cd ${original_dir}
+
+# End of main process
+ui_print "Flash done in $((${BUILDTIME} % 60)) seconds."
+ui_print

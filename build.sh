@@ -1,410 +1,348 @@
 #!/bin/bash
-# Original Live by cybojenix <anthonydking@gmail.com>
-# New Live/Menu by Caio Oliveira aka Caio99BR <caiooliveirafarias0@gmail.com>
-# Colors by Aidas Lukošius aka aidasaidas75 <aidaslukosius75@yahoo.com>
-# Toolchains by Suhail aka skyinfo <sh.skyinfo@gmail.com>
-# Rashed for the base of zip making
+# Original Live Script by cybojenix <anthonydking@gmail.com>
+# Menu by Caio99BR <caiooliveirafarias0@gmail.com>
+# Colors by aidasaidas75 <aidaslukosius75@yahoo.com>
+# Toolchains by skyinfo <sh.skyinfo@gmail.com>
 # Commands for build Xperia E1 boot.img by mpersano <mpr@fzort.org>
+# Rashed for the base of zip making
 # And the internet for filling in else where
 
+# Note!
 # You need to download https://github.com/TeamVee/android_prebuilt_toolchains
 # Clone in the same folder as the kernel to choose a toolchain and not specify a location
 
-# Main Process - Start
-
-maindevice() {
+# Device Choice
+device_choice() {
+clear
+# Devices available
+#
+# Xperia E1
+device_variants_1="D2004 D2005 D2104 D2015 D2114" device_defconfig_1="stock_falconss_defconfig" device_name_1="Sony-XperiaE1"
+# Menu
+echo "${x} | ${color_green}Device choice${color_stock}"
 echo
-defconfig="stock_falconss_defconfig"
-name="XperiaE1"
-make $defconfig &> /dev/null | echo "$x - $name, setting..."
-unset buildprocesscheck zippackagecheck defconfigcheck
+echo "1 | ${device_variants_1} | ${device_name_1}"
+defconfig_updater ${device_name_1}
+echo
+echo "* | Any other key to Exit"
+echo
+read -p "  | Choice | " -n 1 -s x
+case "${x}" in
+	1) device_defconfig=${device_defconfig_1} device_name=${device_name_1};;
+	a)
+		if [ -f .config ]
+		then
+			echo "${x} | Working on ${device_name} defconfig!"
+			make -j${build_cpu_usage}${kernel_build_output_enable} ARCH="${ARCH}" CROSS_COMPILE="${kernel_build_ccache}${CROSS_COMPILE}" savedefconfig
+			mv defconfig arch/${ARCH}/configs/${device_defconfig}
+		fi;;
+	b)
+		if [ -f .config ]
+		then
+			cp .config arch/${ARCH}/configs/${device_defconfig}
+		fi;;
+esac
+if ! [ "${device_defconfig}" == "" ]
+then
+	echo "${x} | Working on ${device_name} defconfig!"
+	make -j${build_cpu_usage}${kernel_build_output_enable} ARCH="${ARCH}" CROSS_COMPILE="${kernel_build_ccache}${CROSS_COMPILE}" ${device_defconfig}
+	sleep 2
+fi
 }
 
-maintoolchain() {
-clear
-echo "-Toolchain choice-"
+# Toolchain Choice
+toolchain_choice() {
+echo "${x} | Toolchain choice"
 echo
 if [ -f ../android_prebuilt_toolchains/aptess.sh ]
-	then . ../android_prebuilt_toolchains/aptess.sh
+then
+	. ../android_prebuilt_toolchains/aptess.sh
 else
-	if [ -d ../android_prebuilt_toolchains ]; then
-		echo "You not have APTESS Script in Android Prebuilt Toolchain folder"
-		echo "Check the folder, using Manual Method now"
-	else
-		echo "-You don't have TeamVee Prebuilt Toolchains-"
-	fi
-	echo ""
-	echo "Please specify a location"
-	echo "and the prefix of the chosen toolchain at the end"
-	echo "GCC 4.6 ex. ../arm-eabi-4.6/bin/arm-eabi-"
-	echo
-	echo "Stay blank if you want to exit"
-	echo
-	read -p "Place: " CROSS_COMPILE
-	if ! [ "$CROSS_COMPILE" == "" ]
-		then ToolchainCompile=$CROSS_COMPILE
-	fi
-fi
-if ! [ "$CROSS_COMPILE" == "" ]
-	then unset buildprocesscheck zippackagecheck
-fi
-}
-
-# Main Process - End
-
-# Build Process - Start
-
-buildprocess() {
-if [ -f .config ]; then
-	echo "$x - Building $customkernel"
-
-	if ! which lz4c > /dev/null
+	if [ -d ../android_prebuilt_toolchains ]
 	then
-		echo "We need LZ4 support on machine, lets install it"
-		sudo apt-get install liblz4-tool -y
-	fi
-
-	if [ -f arch/$ARCH/boot/zImage ]
-		then rm -rf arch/$ARCH/boot/zImage | echo "Removing old kernel image before build"
-	fi
-
-	NR_CPUS=$(($(grep -c ^processor /proc/cpuinfo) + 1))
-	echo "${bldblu}Building $customkernel with $NR_CPUS jobs at once${txtrst}"
-
-	START=$(date +"%s")
-	if [ "$buildoutput" == "OFF" ]
-		then make -j${NR_CPUS} &>/dev/null | loop
-		else make -j${NR_CPUS}
-	fi
-	END=$(date +"%s")
-	BUILDTIME=$(($END - $START))
-
-	if [ -f arch/$ARCH/boot/zImage ]; then
-		buildprocesscheck="Already Done!"
-		zippackagecheck="Ready to do!"
+		echo "  | You not have APTESS Script in Android Prebuilt Toolchain folder"
+		echo "  | Check the folder"
+		echo "  | We will use Manual Method now"
 	else
-		buildprocesscheck="Something goes wrong"
+		echo "  | You don't have TeamVee Prebuilt Toolchains"
 	fi
-else
-	ops
-fi
-}
-
-loop() {
-LEND=$(date +"%s")
-LBUILDTIME=$(($LEND - $START))
-echo -ne "\r\033[K"
-echo -ne "${bldgrn}Build Time: $(($LBUILDTIME / 60)) minutes and $(($LBUILDTIME % 60)) seconds.${txtrst}"
-if ! [ -f arch/$ARCH/boot/zImage ]; then
-	sleep 1
-	loop
-fi
-}
-
-updatedefconfig(){
-if [ -f .config ]; then
-	clear
-	echo "-${bldgrn}Updating defconfig${txtrst}-"
 	echo
-	if [ `cat arch/$ARCH/configs/$defconfig | grep "Automatically" | wc -l` -ge 1 ]
-		then defconfigformat="Usual copy of .config format  | Complete"
-		else defconfigformat="Default Linux Kernel format   | Small"
+	echo "  | Please specify a location"
+	echo "  | and the prefix of the chosen toolchain at the end"
+	echo "  | GCC 4.6 ex. ../arm-eabi-4.6/bin/arm-eabi-"
+	echo
+	echo "  | Stay blank if you want to exit"
+	echo
+	read -p "  | Place | " CROSS_COMPILE
+	if ! [ "${CROSS_COMPILE}" == "" ]
+	then
+		ToolchainCompile="${CROSS_COMPILE}"
 	fi
-	echo "The actual defconfig is a:"
-	echo "--$defconfigformat--"
-	echo
-	echo "This can update defconfig to:"
-	echo "1) Default Linux Kernel format  | Small"
-	echo "2) Usual copy of .config format | Complete"
-	echo
-	echo "*) Any other key to Exit"
-	echo
-	read -p "Choice: " -n 1 -s x
-	case "$x" in
-		1 ) echo "Wait..."; make savedefconfig &>/dev/null; mv defconfig arch/$ARCH/configs/$defconfig;;
-		2 ) cp .config arch/$ARCH/configs/$defconfig;;
-		* ) ;;
-	esac
-else
-	ops
 fi
 }
 
-# Build Process - End
+# Kernel Build Process
+kernel_build() {
+if [ "${CROSS_COMPILE}" == "" ]
+then
+	wrong_choice
+	unset CROSS_COMPILE ToolchainCompile
+elif [ "${ToolchainCompile}" == "" ]
+then
+	wrong_choice
+	unset CROSS_COMPILE ToolchainCompile
+elif [ "${device_defconfig}" == "" ]
+then
+	wrong_choice
+	unset device_name device_defconfig
+elif [ "${device_name}" == "" ]
+then
+	wrong_choice
+	unset device_name device_defconfig
+elif [ ! -f .config ]
+then
+	wrong_choice
+	unset device_name device_defconfig
+else
+	echo "${x} | Building ${builder} ${custom_kernel} ${custom_kernel_branch}"
 
-# Zip Process - Start
-
-zippackage() {
-if ! [ "$defconfig" == "" ]; then
-	if [ -f arch/$ARCH/boot/zImage ]; then
-		echo "$x - Ziping $customkernel"
-
-		zipdirout="zip-creator-out"
-		rm -rf $zipdirout
-		mkdir $zipdirout
-		mkdir $zipdirout/wifi/
-		mkdir $zipdirout/ramdisk/
-
-		cp -r zip-creator/ramdisk/base-ramdisk/* $zipdirout/ramdisk/
-
-		cd $zipdirout/ramdisk/
-		find . | cpio -o -H newc | gzip > ../../$zipdirout/tempramdisk
-		cd ../../
-
-		rm -rf $zipdirout/ramdisk/
-
-		cp -r zip-creator/binary/* $zipdirout/
-		cp drivers/staging/prima/firmware_bin/* $zipdirout/wifi/
-
-		./zip-creator/tool/mkqcdtbootimg \
-		    --kernel arch/arm/boot/zImage \
-		    --ramdisk $zipdirout/tempramdisk \
-		    --dt_dir arch/arm/boot \
-		    --cmdline "`cat zip-creator/ramdisk/cmdline`" \
-		    --base 0x00000000 \
-		    --ramdisk_offset 0x2000000 \
-		    --kernel_offset 0x10000 \
-		    --tags_offset 0x01e00000 \
-		    --pagesize 2048 \
-		    -o $zipdirout/boot.img
-
-		rm -rf $zipdirout/tempramdisk
-
-		echo "${name}" >> $zipdirout/device.prop
-		echo "${Release}" >> $zipdirout/device.prop
-		echo "${revision}" >> $zipdirout/device.prop
-
-		mkdir $zipdirout/modules
-		find . -name *.ko | xargs cp -a --target-directory=$zipdirout/modules/ &> /dev/null
-		${CROSS_COMPILE}strip --strip-unneeded $zipdirout/modules/*.ko
-
-		cd $zipdirout
-		zip -r $zipfile * -x .gitignore &> /dev/null
-		cd ..
-
-		cp $zipdirout/$zipfile zip-creator
-		rm -rf $zipdirout
-
-		zippackagecheck="Already Done!"
+	if [ $(which ccache) ]
+	then
+		kernel_build_ccache="ccache "
+		echo "  | ${color_blue}Using CCache to build${color_stock}"
 	else
-		ops
+		echo "  | ${color_blue}CCache not enabled${color_stock}"
+	fi
+
+	echo "  | ${color_blue}Using ${build_cpu_usage} jobs at once${color_stock}"
+
+	start_build_time=$(date +"%s")
+	make -j${build_cpu_usage}${kernel_build_output_enable} ARCH="${ARCH}" CROSS_COMPILE="${kernel_build_ccache}${CROSS_COMPILE}"
+	if ! [ "$?" == "0" ]
+	then
+		echo "  | ${color_red}Build Failed! Exiting...${color_stock}"
+		break
+	fi
+	sleep 2
+	build_time=$(($(date +"%s") - ${start_build_time}))
+	build_time_minutes=$((${build_time} / 60))
+fi
+}
+
+# Zip Packer Process
+zip_packer() {
+if ! [ "${device_defconfig}" == "" ]
+then
+	if [ -f arch/${ARCH}/boot/zImage ]
+	then
+		echo "${x} | Ziping ${builder} ${custom_kernel} ${custom_kernel_branch}"
+
+		# Make base of zip
+		original_dir=$(pwd)
+		zip_out="/tmp/zip-creator_out"
+		rm -rf ${zip_out}
+		mkdir -p ${zip_out}/META-INF/com/google/android/
+
+		# Copy core files
+		cp zip-creator/base/update-binary ${zip_out}/META-INF/com/google/android/
+		cp -R zip-creator/base/base-ramdisk/ ${zip_out}/base-ramdisk/
+
+		cd ${zip_out}/base-ramdisk/sbin/ramdisk
+		find . | cpio -o -H newc > ${zip_out}/base-ramdisk/sbin/ramdisk.cpio
+		cd ${original_dir}
+
+		cd ${zip_out}/base-ramdisk
+		find . | cpio -o -H newc | gzip > ${zip_out}/ramdisk
+		cd ${original_dir}
+		rm -rf ${zip_out}/base-ramdisk
+
+		chmod a+x zip-creator/base/mkqcdtbootimg
+		./zip-creator/base/mkqcdtbootimg \
+		--kernel arch/${ARCH}/boot/zImage \
+		--ramdisk ${zip_out}/ramdisk \
+		--dt_dir arch/${ARCH}/boot \
+		--cmdline "$(cat zip-creator/base/cmdline)" \
+		--base 0x00000000 \
+		--ramdisk_offset 0x02000000 \
+		--tags_offset 0x01E00000 \
+		--pagesize 2048 \
+		-o ${zip_out}/boot.img &> /dev/null
+
+		# Set device
+		echo "${builder}" >> ${zip_out}/device.prop
+		echo "${custom_kernel} ${custom_kernel_branch}" >> ${zip_out}/device.prop
+		echo "${device_name}" >> ${zip_out}/device.prop
+		echo "Release ${release}" >> ${zip_out}/device.prop
+
+		# Stock need new firmware files
+		mkdir -p ${zip_out}/wifi/
+		cp drivers/staging/prima/firmware_bin/WCNSS_cfg.dat ${zip_out}/wifi/
+		cp drivers/staging/prima/firmware_bin/WCNSS_qcom_cfg.ini ${zip_out}/wifi/
+
+		# We need modules
+		mkdir ${zip_out}/modules
+		find . -name *.ko | xargs cp -a --target-directory=${zip_out}/modules/ &> /dev/null
+		${CROSS_COMPILE}strip --strip-unneeded ${zip_out}/modules/*.ko
+
+		# Pack zip
+		cd ${zip_out}
+		zip -r ${zipfile} * -x .gitignore &> /dev/null
+		cd ${original_dir}
+
+		# Copy the zip created
+		cp ${zip_out}/${zipfile} zip-creator/
+		rm -rf ${zip_out}
+	else
+		wrong_choice
 	fi
 else
-	ops
+	wrong_choice
 fi
 }
 
-# Zip Process - End
-
-# ADB - Start
-
-adbcopy() {
-if [ -f zip-creator/$zipfile ]; then
-	clear
-	echo "-Coping $customkernel-"
-	echo
-	echo "You want to copy to Internal or External Card?"
-	echo "i) For Internal"
-	echo "e) For External"
-	echo
-	echo "*) Any other key to Exit"
-	echo
-	read -p "Choice: " -n 1 -s x
-	case "$x" in
-		i ) echo "Coping to Internal Card..."; adb shell rm -rf /storage/sdcard0/$zipfile &> /dev/null; adb push zip-creator/$zipfile /storage/sdcard0/$zipfile &> /dev/null;;
-		e ) echo "Coping to External Card..."; adb shell rm -rf /storage/sdcard1/$zipfile &> /dev/null; adb push zip-creator/$zipfile /storage/sdcard1/$zipfile &> /dev/null;;
-		* ) ;;
-	esac
-else
-	ops
-fi
-}
-
-# ADB - End
-
-# TAG Uploader - Start
-
-tagupload() {
-clear
-echo "-Pushing tag-"
-echo
-echo "Delete local and remote tag with same name if have one"
-echo "And create and push new tag"
-echo
-if [ -f .travis.yml ]; then
-	echo "This is integration on Travis CI"
-	echo "Just to make upload and build trigger more easy"
-	echo
-fi
-echo "TAG to upload in 'origin': $build"
-echo
-echo "y) If you want to continue"
-echo
-echo "*) Any other key to Exit"
-echo
-read -p "Choice: " -n 1 -s x
-case $x in
-	"y") echo
-	echo "Deleting local TAG, if have one"
-	git tag -d $build
-	echo "Deleting Remote TAG, if have one"
-	if ! [ -f ~/.git-credentials ]
-		then git config credential.helper 'cache --timeout=300'
+# Updater of defconfigs
+defconfig_updater() {
+if [ -f .config ]
+then
+	if [[ "${device_defconfig}" == "${1}" || "${device_name}" == "${1}" ]]
+	then
+		echo "  | Update defconfig to:"
+		echo "a | Default Linux Kernel format  | Small"
+		echo "b | Usual copy of .config format | Complete"
+		echo
 	fi
-	git push --delete origin $build
+fi
+}
+
+# Copy zip's via ADB
+zip_copy_adb() {
+if [ -f zip-creator/${zipfile} ]
+then
+	echo "${x} | Coping ${builder} ${custom_kernel} ${custom_kernel_branch}"
 	echo
-	echo "Creating new local TAG"
-	git tag $build
-	echo "Pushing new local TAG to Remote"
-	git push origin --tags
-	sleep 3
-esac
-}
-
-# TAG Uploader - End
-
-# Menu - Start
-
-buildsh() {
-clear
-echo "Simple Linux Kernel Build Script ($(date +%d"/"%m"/"%Y))"
-echo "$customkernel $kernelversion.$kernelpatchlevel.$kernelsublevel - $kernelname"
-echo "-${bldred}Clean${txtrst}-"
-echo "1) Zip Packages | ${bldred}$cleanzipcheck${txtrst}"
-echo "2) Kernel       | ${bldred}$cleankernelcheck${txtrst}"
-echo "-${bldgrn}Main Process${txtrst}-"
-echo "3) Device Choice    | ${bldgrn}$name${txtrst}"
-echo "4) Toolchain Choice | ${bldgrn}$ToolchainCompile${txtrst}"
-echo "-${bldyel}Build Process${txtrst}-"
-echo "5) Build Kernel      | ${bldyel}$buildprocesscheck${txtrst}"
-if ! [ "$BUILDTIME" == "" ]
-	then echo "   Build Time        | ${bldcya}$(($BUILDTIME / 60))m$(($BUILDTIME % 60))s${txtrst}"
+	adb shell rm -rf /data/media/0/${zipfile} &> /dev/null
+	adb push zip-creator/${zipfile} /data/media/0/${zipfile} &> /dev/null
+	if ! [ "$?" == "0" ]
+	then
+		echo "  | Copy failed!"
+		if [ ! "$(which adb)" ]
+		then
+			echo "  | ADB not installed!"
+		else
+			echo "  | Check connection!"
+		fi
+		sleep 2
+	fi
+else
+	wrong_choice
 fi
-echo "6) Build Zip Package | ${bldyel}$zippackagecheck${txtrst}"
-if [ -f zip-creator/$zipfile ]
-	then echo "   Zip Saved         | ${bldcya}zip-creator/$zipfile${txtrst}"
-fi
-echo "-${bldblu}Special Menu${txtrst}-"
-echo "7) Update Defconfig                          | ${bldblu}$defconfigcheck${txtrst}"
-echo "8) Copy Latest Build Zip to device - Via Adb | ${bldblu}$zipcopycheck${txtrst}"
-echo "9) Reboot device to recovery"
-echo "t) Git Push TAG"
-echo "-${bldmag}Options${txtrst}-"
-echo "o) View Build Output | $buildoutput | z) Local testing | $localoutput"
-echo "g) Git Gui  |  k) GitK  |  s) Git Push  |  l) Git Pull"
-echo "q) Quit"
-echo
-read -n 1 -p "${txtbld}Choice: ${txtrst}" -s x
-case $x in
-	1) echo "$x - Cleaning Zips"; rm -rf zip-creator/*.zip; unset zippackagecheck;;
-	2) echo "$x - Cleaning Kernel"; make clean mrproper &> /dev/null; unset buildprocesscheck name defconfig BUILDTIME;;
-	3) maindevice;;
-	4) maintoolchain;;
-	5) buildprocess;;
-	6) zippackage;;
-	7) updatedefconfig;;
-	8) adbcopy;;
-	9) echo "$x - Rebooting to Recovery..."; adb reboot recovery;;
-	t) tagupload;;
-	o) if [ "$buildoutput" == "OFF" ]; then unset buildoutput; else buildoutput="OFF"; fi;;
-	z) if [ "$localoutput" == "OFF" ]; then localoutput="${bldmag}ON${txtrst}"; else localoutput="OFF"; fi;;
-	q) echo "$x - Ok, Bye!"; break;;
-	g) echo "$x - Opening Git Gui"; git gui;;
-	k) echo "$x - Opening GitK"; gitk;;
-	s) echo "$x - Pushing to remote repo"; git push --verbose --all; sleep 3;;
-	l) echo "$x - Pushing to local repo"; git pull --verbose --all; sleep 3;;
-	*) ops;;
-esac
 }
 
-# Menu - End
-
-# The core of script is here!
-
-ops() {
-echo "$x - This option is not valid"; sleep 1
+# Wrong choice
+wrong_choice() {
+echo "${x} | This option is not available! | Something is wrong! | Check ${color_green}Choice Menu${color_stock}!"; sleep 2
 }
 
-if [ ! "$BASH_VERSION" ]
-	then echo "Please do not use sh to run this script, just use . build.sh"
-elif [ -e build.sh ]; then
+if [ ! "${BASH_VERSION}" ]
+then
+	echo "  | Please do not use ${0} to run this script, just use '. build.sh'"
+elif [ -e build.sh ]
+then
 	# Stock Color
-	txtrst=$(tput sgr0)
+	color_stock=$(tput sgr0)
 	# Bold Colors
-	txtbld=$(tput bold) # Bold
-	bldred=${txtbld}$(tput setaf 1) # red
-	bldgrn=${txtbld}$(tput setaf 2) # green
-	bldyel=${txtbld}$(tput setaf 3) # yellow
-	bldblu=${txtbld}$(tput setaf 4) # blue
-	bldmag=${txtbld}$(tput setaf 5) # magenta
-	bldcya=${txtbld}$(tput setaf 6) # cyan
-	bldwhi=${txtbld}$(tput setaf 7) # white
+	color_red=$(tput bold)$(tput setaf 1)
+	color_green=$(tput bold)$(tput setaf 2)
+	color_yellow=$(tput bold)$(tput setaf 3)
+	color_blue=$(tput bold)$(tput setaf 4)
+	# Main Variables
+	custom_kernel=FalconSSKernel
+	builder=Caio99BR
+	custom_kernel_branch=KK-Stock
+	ARCH=arm
 
-	customkernel=FalconSSKernel
-	export ARCH=arm
-
-	while true; do
-		if [ "$buildoutput" == "" ]
-			then buildoutput="${bldmag}ON${txtrst}"
+	while true
+	do
+		# Kernel OutPut
+		if [ "${kernel_build_output}" == "(OFF)" ]
+		then
+			kernel_build_output_enable=" -s"
+		else
+			kernel_build_output="(${color_green}ON${color_stock})"
+			unset kernel_build_output_enable
 		fi
-		if [ "$zippackagecheck" == "Already Done!" ]
-			then zipcopycheck="Ready to do!"
-			else zipcopycheck="Use 6 first"
-		fi
-		if [ "$buildprocesscheck" == "" ]
-			then buildprocesscheck="Ready to do!"
-		fi
-		if [ "$buildprocesscheck" == "Ready to do!" ]
-			then zippackagecheck="Use 5 first"
-		fi
-		if [ "$buildprocesscheck" == "Already Done!" ]; then
-			if ! [ "$zippackagecheck" == "Already Done!" ]
-				then zippackagecheck="Ready to do!"
+		# Build Time
+		if ! [ "${build_time}" == "" ]
+		then
+			if [ "${build_time_minutes}" == "" ]
+			then
+				menu_build_time="(${color_green}$((${build_time} % 60))s${color_stock})"
+			else
+				menu_build_time="(${color_green}${build_time_minutes}m$((${build_time} % 60))s${color_stock})"
 			fi
 		fi
-		if [ "$CROSS_COMPILE" == "" ]
-			then buildprocesscheck="Use 4 first"
-		fi
-		if [ "$defconfig" == "" ]; then
-			buildprocesscheck="Use 3 first"
-			defconfigcheck="Use 3 first"
-		else
-			defconfigcheck="Ready to do!"
-		fi
-		if [ -f zip-creator/*.zip ]
-			then unset cleanzipcheck
-			else cleanzipcheck="Already Done!"
-		fi
-		if [ -f .config ]
-			then unset cleankernelcheck
-			else cleankernelcheck="Already Done!"
-		fi
-		Release=5
-		revision=8
-		build=R${Release}r${revision}
-		if [ "$localoutput" == "" ]
-		then
-			localoutput="OFF"
-		fi
-		if ! [ "$localoutput" == "OFF" ]
-		then
-			build=$(cat .version)-$build
-			localoutput="${bldmag}ON${txtrst}"
-		fi
-		kernelversion=`cat Makefile | grep VERSION | cut -c 11- | head -1`
-		kernelpatchlevel=`cat Makefile | grep PATCHLEVEL | cut -c 14- | head -1`
-		kernelsublevel=`cat Makefile | grep SUBLEVEL | cut -c 12- | head -1`
-		kernelname=`cat Makefile | grep NAME | cut -c 8- | head -1`
+		build_cpu_usage=$(($(grep -c ^processor /proc/cpuinfo) + 1))
+		# Variable's
+		k_version=$(cat Makefile | grep VERSION | cut -c 11- | head -1)
+		k_patch_level=$(cat Makefile | grep PATCHLEVEL | cut -c 14- | head -1)
+		k_sub_level=$(cat Makefile | grep SUBLEVEL | cut -c 12- | head -1)
+		kernel_base="${k_version}.${k_patch_level}.${k_sub_level}"
 		release=$(date +%d""%m""%Y)
-		export zipfile="$customkernel-$name-$release-$build.zip"
-
-		buildsh
+		build=R5r8
+		export zipfile="${custom_kernel}-${custom_kernel_branch}-${device_name}-${release}-${build}.zip"
+		# Check ZIP
+		if [ -f zip-creator/${zipfile} ]
+		then
+			menu_zipfile="(${color_green}zip-creator/${zipfile}${color_stock})"
+		else
+			unset menu_zipfile
+		fi
+		# Menu
+		clear
+		echo "  | Simple Linux Kernel ${kernel_base} Build Script ($(date +%d"/"%m"/"%Y))"
+		echo "  | ${builder} ${custom_kernel} ${custom_kernel_branch} Release $(date +%d"/"%m"/"%Y) Build #${build}"
+		echo
+		echo "  | ${color_red}Clean Menu${color_stock}"
+		echo "1 | Clean Zip Folder"
+		echo "2 | Clean Kernel"
+		echo "  | ${color_green}Choice Menu${color_stock}"
+		echo "3 | Set Device Defconfig ${color_green}${device_name}${color_stock}"
+		echo "4 | Set Toolchain        ${color_green}${ToolchainCompile}${color_stock}"
+		echo "5 | Toggle Build Output  ${kernel_build_output}"
+		echo "  | ${color_yellow}Build Menu${color_stock}"
+		echo "6 | Build Kernel         ${menu_build_time}"
+		echo "7 | Build Zip Package    ${menu_zipfile}"
+		echo "8 | Copy Zip to '/data/media/0' of Device"
+		echo "e | Exit"
+		echo
+		read -n 1 -p "  | Choice | " -s x
+		case ${x} in
+			1) rm -rf zip-creator/*.zip;;
+			2)
+				echo "${x} | Cleaning Kernel"
+				make -j${build_cpu_usage}${kernel_build_output_enable} ARCH="${ARCH}" CROSS_COMPILE="${kernel_build_ccache}${CROSS_COMPILE}" clean mrproper
+				unset device_name device_defconfig build_time;;
+			3) device_choice;;
+			4) toolchain_choice;;
+			5)
+				if [ "${kernel_build_output}" == "(OFF)" ]
+				then
+					unset kernel_build_output
+				else
+					kernel_build_output="(OFF)"
+				fi;;
+			6) kernel_build;;
+			7) zip_packer;;
+			8) zip_copy_adb;;
+			q|e) echo "${x} | Ok, Bye!"; break;;
+			*) wrong_choice;;
+		esac
 	done
 else
 	echo
-	echo "Ensure you run this file from the SAME folder as where it was,"
-	echo "otherwise the script will have problems running the commands."
-	echo "After you 'cd' to the correct folder, start the build script"
-	echo "with the . build.sh command, NOT with any other command!"
+	echo "  | Ensure you run this file from the SAME folder as where it was,"
+	echo "  | otherwise the script will have problems running the commands."
+	echo "  | After you 'cd' to the correct folder, start the build script"
+	echo "  | with the . build.sh command, NOT with any other command!"
 	echo
 fi

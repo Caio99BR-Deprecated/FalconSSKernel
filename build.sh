@@ -106,6 +106,12 @@ then
 else
 	echo "${x} | Building ${builder} ${custom_kernel} ${custom_kernel_branch}"
 
+	if [ ! $(which lz4c) ]
+	then
+		echo "We need LZ4 support on machine, lets install it"
+		sudo apt-get install liblz4-tool -y
+	fi
+
 	if [ $(which ccache) ]
 	then
 		kernel_build_ccache="ccache "

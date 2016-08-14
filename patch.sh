@@ -1,60 +1,62 @@
 #!/bin/bash
 # Writen by Caio Oliveira aka Caio99BR <caiooliveirafarias0@gmail.com>
-# How to Use:
-# . patch link.to.commit
-#
-# This script can apply various commits at once.
-# . patch link.to.first.commit ... link.to.commit.over.8000 this.cant.be.possible
 
-if [ ${#} == "0" ]; then
-	echo
-	echo "    Put the link after '. patch.sh'"
-	echo "    To use this script"
-	echo
-else
-	echo $(tput bold)$(tput setaf 1)"Number of patch's: ${#}"$(tput sgr0)
-	c="0"
-	for link in ${@}; do
-		c=$[$c+1]
-		echo
-		echo $(tput bold)$(tput setaf 1)"Patch #${c}"$(tput sgr0)
-		if [[ $link == *".patch" ]]; then
-			nl=$link
-		else
-			nl=$link.patch
-		fi
-		patch_filename="patch.sh-${c}.patch"
-		echo "- Downloading..."
-		curl -# -o $patch_filename $nl
-		if [ -f $patch_filename ]
+echo "  | Live Git Patcher"
+echo "  |"
+echo "  | Put the link after '. patch.sh'"
+echo "  | To use this script"
+echo "  |"
+echo "  | Number of patch's: ${#}"
+c="0"
+for link in ${@}
+do
+	c=$[$c+1]
+	echo "  |"
+	echo "  | Patch #${c}"
+	if [ "${link}" == *".patch" ]
+	then
+		nl="${link}"
+	else
+		nl="${link}.patch"
+	fi
+	path_patch="/tmp/patch.sh-${c}.patch"
+	echo "  |"
+	echo "  | Downloading"
+	curl -# -o ${path_patch} ${nl}
+	if [ -f "${path_patch}" ]
+	then
+		echo "  |"
+		echo "  | Patching"
+		git am -3 ${path_patch}
+		if [ "${?}" == "0" ]
 		then
-			echo "- Patching..."
-			git am $patch_filename
-			if [ $? == "0" ]; then
-				echo $(tput bold)$(tput setaf 2)"Patch (${c}/${#})"$(tput sgr0)
-			else
-				echo $(tput bold)$(tput setaf 1)"Something not worked good in patch #${c}"
-				echo "Aborting 'git am' process"
-				if ! [ "${c}" == "${#}" ]
-				then
-					if [ ${#} -gt "1" ]; then
-						echo
-						echo "Passing to next patch"
-					fi
-				fi
-				echo $(tput sgr0)
-				git am --abort
-			fi
+			echo "  |"
+			echo "  | Patch (${c}/${#})"
 		else
-			echo "Patch not downloaded, check internet or link"
+			echo "  |"
+			echo "  | Something not worked good in patch #${c}"
+			echo "  | Aborting 'git am' process"
+			git am --abort
 			if ! [ "${c}" == "${#}" ]
 			then
-				if [ ${#} -gt "1" ]; then
-					echo
-					echo "Passing to next patch"
+				if [ ${#} -gt "1" ]
+				then
+					echo "  |"
+					echo "  | Passing to next patch"
 				fi
 			fi
 		fi
-		rm -rf $patch_filename
-	done
-fi
+	else
+		echo "  |"
+		echo "  | Patch not downloaded, check internet or link"
+		if ! [ "${c}" == "${#}" ]
+		then
+			if [ ${#} -gt "1" ]
+			then
+				echo "  |"
+				echo "  | Passing to next patch"
+			fi
+		fi
+	fi
+	rm -rf ${path_patch}
+done

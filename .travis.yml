@@ -1,13 +1,61 @@
 sudo: required
 language: c
+cache: ccache
 script:
+#
+# Travis CI Script by Caio Oliveira aka Caio99BR <caiooliveirafarias0@gmail.com>
+#
+
+# Install dependency
 - sudo add-apt-repository ppa:nathan-renniewaldock/ppa -y
 - sudo apt-get update
+
+#
+# Toolchain Choice
+# This will clone TeamVee Prebuilt Toolchains in directory described in build.sh
+#
+# Branchs available is:
+# Google Branch is "google_gcc" | (1) 4.7 / (2) 4.8
+# Linaro Branch is "linaro_gcc" | (1) 4.8.4 / (2) 4.9.4
+
+# Toolchain branch select here is Google 4.7
 - export ntoolchainbranch="google_gcc"
-- export ntoolchainchoice="1"
 - git clone -b "${ntoolchainbranch}" "https://github.com/TeamVee/android_prebuilt_toolchains" "../android_prebuilt_toolchains"
-- export nbasebuildsh="234${ntoolchainchoice}56q"
-- source build.sh <<< "${nbasebuildsh}"
+
+# ${ntoolchainchoice} is your Toolchain Choice
+- export ntoolchainchoice="1"
+
+# ${ntoolchain}
+# "4" is "Toolchain Choice"
+- ntoolchain="4${ntoolchainchoice}"
+
+# ${ndevice}
+# "2" is "Clean Kernel"
+# "3" is "Device Choice"
+- ndevice="23"
+
+# ${ndevicechoice} is "Number of Choice under Device Choice"
+# - export ndevicechoice="#"
+
+# ${nbuild}
+# "6" is "Build Kernel"
+# "7" is "Zip the kernel and Modules"
+# "q" is to Exit of Script
+- nbuild="67q"
+
+# Main variables
+# Call of 'build.sh'
+# - source build.sh <<< "${ndevice}${ndevicechoice}${ntoolchain}${nbuild}"
+
+# Export of zipfile to deploy
+# - export zipfile#="${zipfile}"
+
+# TravisCI Custom Patches
+- patch -p1 < zip-creator/travis-ci/0001-TravisCI-Custom-Patches.patch
+
+# Build for Sony Xperia E1 (Single/Dual/DTV) | D2004 D2005 D2104 D2015 D2114
+- export ndevicechoice="1"
+- source build.sh <<< "${ndevice}${ndevicechoice}${ntoolchain}${nbuild}"
 deploy:
   provider: releases
   skip_cleanup: true

@@ -146,38 +146,46 @@ then
 		# Make base of zip
 		original_dir=$(pwd)
 		zip_out="/tmp/zip-creator_out"
-		rm -rf ${zip_out}
+		rm -rf ${zip_out}/
 		mkdir -p ${zip_out}/META-INF/com/google/android/
+		mkdir -p ${zip_out}/base-ramdisk/
 
-		# Copy core files
+		# Copy Update Binary
 		cp zip-creator/base/update-binary ${zip_out}/META-INF/com/google/android/
-		cp -R zip-creator/base/base-ramdisk/ ${zip_out}/base-ramdisk/
+
+		# Copy ramdisk and delete folder_holder files
+		cd zip-creator/base/base-ramdisk/
+		find . -depth | cpio -pmdv ${zip_out}/base-ramdisk/
+		cd ${original_dir}/
+		rm -rf $(find ${zip_out}/base-ramdisk/ -name folder_holder)
 
 		# Make android ramdisk
-		cd ${zip_out}/base-ramdisk/sbin/ramdisk
+		cd ${zip_out}/base-ramdisk/sbin/ramdisk/
+		chmod +x ${original_dir}/zip-creator/base/ramdisk_permissions.sh
+		${original_dir}/zip-creator/base/ramdisk_permissions.sh
 		find . | cpio -o -H newc > ${zip_out}/base-ramdisk/sbin/ramdisk.cpio
-		cd ${original_dir}
+		cd ${original_dir}/
+		rm -rf ${zip_out}/base-ramdisk/sbin/ramdisk/
 
 		# Make main ramdisk
-		cd ${zip_out}/base-ramdisk
-		find . | cpio -o -H newc | gzip > ${zip_out}/ramdisk
-		cd ${original_dir}
+		cd ${zip_out}/base-ramdisk/
+		find . | cpio -o -H newc | gzip > ${zip_out}/ramdisk.cpio.gz
+		cd ${original_dir}/
+		rm -rf ${zip_out}/base-ramdisk/
 
 		# Make new boot.img
-		chmod a+x zip-creator/base/mkqcdtbootimg
-		./zip-creator/base/mkqcdtbootimg \
+		chmod +x ${original_dir}/zip-creator/base/mkqcdtbootimg
+		${original_dir}/zip-creator/base/mkqcdtbootimg \
 		--kernel arch/${ARCH}/boot/zImage \
-		--ramdisk ${zip_out}/ramdisk \
+		--ramdisk ${zip_out}/ramdisk.cpio.gz \
 		--dt_dir arch/${ARCH}/boot \
 		--cmdline "$(cat zip-creator/base/cmdline)" \
 		--base 0x00000000 \
 		--ramdisk_offset 0x02000000 \
 		--tags_offset 0x01E00000 \
 		--pagesize 2048 \
-		-o ${zip_out}/boot.img &> /dev/null
-
-		# Cleanup
-		rm -rf ${zip_out}/base-ramdisk ${zip_out}/ramdisk
+		-o ${zip_out}/boot.img
+		rm -rf ${zip_out}/ramdisk.cpio.gz
 
 		# Set device
 		echo "${builder}" >> ${zip_out}/device.prop
@@ -196,13 +204,13 @@ then
 		${CROSS_COMPILE}strip --strip-unneeded ${zip_out}/modules/*.ko
 
 		# Pack zip
-		cd ${zip_out}
+		cd ${zip_out}/
 		zip -r ${zipfile} * -x .gitignore &> /dev/null
-		cd ${original_dir}
+		cd ${original_dir}/
 
 		# Copy the zip created
 		cp ${zip_out}/${zipfile} zip-creator/
-		rm -rf ${zip_out}
+		rm -rf ${zip_out}/
 	else
 		wrong_choice
 	fi

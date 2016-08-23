@@ -2,8 +2,8 @@
 # ADDITIONAL_DEFAULT_PROPERTIES
 #
 persist.sys.usb.config=mtp
-ro.secure=1
-ro.adb.secure=1
+ro.secure=false
+ro.adb.secure=false
 ro.allow.mock.location=0
 ro.debuggable=0
 persist.sys.strict_op_enable=false

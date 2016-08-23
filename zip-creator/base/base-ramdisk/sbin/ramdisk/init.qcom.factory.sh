@@ -119,18 +119,18 @@
     # an ack packet comes out of order
     echo 1 > /proc/sys/net/netfilter/nf_conntrack_tcp_be_liberal
 
-#TODO:
-# basic network init
-#    ifup lo
-#    hostname localhost
-#    domainname localdomain
+    #TODO:
+    # basic network init
+    #    ifup lo
+    #    hostname localhost
+    #    domainname localdomain
 
-# set RLIMIT_NICE to allow priorities from 19 to -20
-#    setrlimit 13 40 40
+    # set RLIMIT_NICE to allow priorities from 19 to -20
+    #    setrlimit 13 40 40
 
-# Memory management.  Basic kernel parameters, and allow the high
-# level system server to be able to adjust the kernel OOM driver
-# parameters to match how it is managing things.
+    # Memory management.  Basic kernel parameters, and allow the high
+    # level system server to be able to adjust the kernel OOM driver
+    # parameters to match how it is managing things.
     echo 1 > /proc/sys/vm/overcommit_memory
     echo 4 > /proc/sys/vm/min_free_order_shift
     chown -h root.system /sys/module/lowmemorykiller/parameters/adj
@@ -206,8 +206,8 @@
     chown -h system.system /sys/kernel/ipv4/tcp_rmem_max
     chown -h root radio /proc/cmdline
 
-# Define TCP buffer sizes for various networks
-#   ReadMin, ReadInitial, ReadMax, WriteMin, WriteInitial, WriteMax,
+    # Define TCP buffer sizes for various networks
+    #   ReadMin, ReadInitial, ReadMax, WriteMin, WriteInitial, WriteMax,
     setprop net.tcp.buffersize.default 4096,87380,110208,4096,16384,110208
     setprop net.tcp.buffersize.wifi    524288,1048576,2097152,262144,524288,1048576
     setprop net.tcp.buffersize.lte     524288,1048576,2097152,262144,524288,1048576
@@ -220,20 +220,20 @@
     setprop net.tcp.buffersize.gprs    4092,8760,11680,4096,8760,11680
     setprop net.tcp.buffersize.evdo    4094,87380,262144,4096,16384,262144
 
-# Assign TCP buffer thresholds to be ceiling value of technology maximums
-# Increased technology maximums should be reflected here.
+    # Assign TCP buffer thresholds to be ceiling value of technology maximums
+    # Increased technology maximums should be reflected here.
     echo 2097152 > /proc/sys/net/core/rmem_max
     echo 2097152 > /proc/sys/net/core/wmem_max
 
-# Set the property to indicate type of virtual display to 0
-# 0 indicates that virtual display is not a Wifi display and that the
-# session is not exercised through RemoteDisplay in the android framework
+    # Set the property to indicate type of virtual display to 0
+    # 0 indicates that virtual display is not a Wifi display and that the
+    # session is not exercised through RemoteDisplay in the android framework
     setprop persist.sys.wfd.virtual 0
 
-# Set this property so surfaceflinger is not started by system_init
+    # Set this property so surfaceflinger is not started by system_init
     setprop system_init.startsurfaceflinger 0
 
-# Start the following services needed for fftm
+    # Start the following services needed for fftm
     start config_bluetooth
     start media
     start fastmmi

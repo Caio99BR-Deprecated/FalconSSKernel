@@ -30,4 +30,3 @@ baseband=`getprop ro.baseband`
 if [ "$baseband" = "mdm" ]; then
 	start mdm_helper
 fi
-

@@ -14,9 +14,7 @@ fi
 TAG="usb"
 VENDOR_ID=0FCE
 PID_PREFIX=0
-#/*[Arima JimCheng 20131014] support PC Companion++*/
 CDROM_ENABLE=0
-#/*[Arima JimCheng 20131014] support PC Companion--*/
 
 get_pid_prefix()
 {
@@ -39,17 +37,12 @@ get_pid_prefix()
 
     "mtp,cdrom")
       PID_PREFIX=4
-#/*[Arima JimCheng 20131014] support PC Companion++*/
       CDROM_ENABLE=1
-#/*[Arima JimCheng 20131014] support PC Companion--*/
       ;;
 
     "mtp,cdrom,adb")
       PID_PREFIX=4
-#/*[Arima JimCheng 20131014] support PC Companion++*/
       CDROM_ENABLE=1
-#/*[Arima JimCheng 20131014] support PC Companion--*/
-# Don't enable ADB for PCC mode.
       USB_FUNCTION="mtp,cdrom"
       ;;
 
@@ -81,9 +74,6 @@ get_pid_prefix()
 set_engpid()
 {
   case $1 in
-#/*[Arima JimCheng 20131004] Modify SoMC USB PID ++*/
-#    "mass_storage,adb") PID_PREFIX=6 ;;
-#    "mtp,adb") PID_PREFIX=5 ;;
     "mass_storage,adb"|"adb,mass_storage")
       PID_PREFIX=6
       USB_FUNCTION="diag,adb,serial,mass_storage"
@@ -92,7 +82,6 @@ set_engpid()
       PID_PREFIX=5
       USB_FUNCTION="diag,adb,serial,mtp"
       ;;
-#/*[Arima JimCheng 20131004] Modify SoMC USB PID --*/
     *)
       /system/bin/log -t ${TAG} -p i "No eng PID for: $1"
       return 1
@@ -100,9 +89,6 @@ set_engpid()
   esac
 
   PID=${PID_PREFIX}146
-#/*[Arima JimCheng 20131004] Modify SoMC USB PID ++*/
-#  USB_FUNCTION=${1},serial,diag,rmnet
-#/*[Arima JimCheng 20131004] Modify SoMC USB PID --*/
   echo diag > /sys/class/android_usb/android0/f_diag/clients
   echo smd,tty > /sys/class/android_usb/android0/f_serial/transports
   echo smd,bam > /sys/class/android_usb/android0/f_rmnet/transports
@@ -134,9 +120,7 @@ echo ${PID} > /sys/class/android_usb/android0/idProduct
 echo 0 > /sys/class/android_usb/android0/bDeviceClass
 echo 0 > /sys/class/android_usb/android0/bDeviceSubClass
 echo 0 > /sys/class/android_usb/android0/bDeviceProtocol
-#/*[Arima JimCheng 20131014] support PC Companion++*/
 echo ${CDROM_ENABLE} > /sys/class/android_usb/android0/f_mass_storage/lun/cdrom
-#/*[Arima JimCheng 20131014] support PC Companion--*/
 
 echo ${USB_FUNCTION} > /sys/class/android_usb/android0/functions
 /system/bin/log -t ${TAG} -p i "enabled usb functions: ${USB_FUNCTION}"

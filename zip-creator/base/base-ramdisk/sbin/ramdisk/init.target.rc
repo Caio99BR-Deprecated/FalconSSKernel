@@ -32,7 +32,6 @@ on early-init
     symlink /data/tombstones /tombstones
     write /sys/kernel/mm/ksm/pages_to_scan 300
     write /sys/kernel/mm/ksm/sleep_millisecs 1200
-    write /sys/kernel/mm/ksm/run 1
     write /sys/block/zram0/disksize 192M
 
 on init
@@ -58,16 +57,6 @@ on post-fs
     # Change to socket location on libkeyctrl/suntory for /data encryption
     mkdir /dev/socket/suntory 0755 system system
 
-# Allow usb charging to be disabled persistently
-on property:persist.usb.chgdisabled=1
-    write /sys/class/power_supply/battery/charging_enabled 0
-
-on property:persist.usb.chgdisabled=0
-    write /sys/class/power_supply/battery/charging_enabled 1
-
-on boot
-    insmod /system/lib/modules/adsprpc.ko
-
 on property:gsm.nitz.time=*
     exec /system/bin/scdnotifier nitz
 
@@ -85,7 +74,7 @@ service time_daemon /system/bin/time_daemon
    user root
    group root
 
-service mpdecision /system/bin/mpdecision --no_sleep --avg_comp
+service mpdecision /system/bin/mpdecision --avg_comp
    user root
    disabled
 

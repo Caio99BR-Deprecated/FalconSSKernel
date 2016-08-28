@@ -95,7 +95,6 @@ loglevel 3
     write /proc/sys/kernel/sched_child_runs_first 0
     write /proc/sys/kernel/randomize_va_space 2
     write /proc/sys/kernel/kptr_restrict 2
-    write /proc/sys/kernel/dmesg_restrict 1
     write /proc/sys/vm/mmap_min_addr 32768
     write /proc/sys/net/ipv4/ping_group_range "0 2147483647"
     write /proc/sys/kernel/sched_rt_runtime_us 950000
@@ -165,7 +164,6 @@ on post-fs
     chmod 0555 /lta-label
 
     # This may have been created by the recovery system with odd permissions
-    mkdir /cache/recovery 0770 system cache
     chown system cache /cache/recovery
     chmod 0770 /cache/recovery
 

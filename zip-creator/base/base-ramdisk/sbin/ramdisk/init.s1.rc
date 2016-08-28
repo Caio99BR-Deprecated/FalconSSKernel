@@ -4,19 +4,10 @@ on fs
     class_start trimarea
     exec /sbin/wait4tad_static
 
-    wait /dev/block/platform/msm_sdcc.1/by-name/cache
-    mount ext4 /dev/block/platform/msm_sdcc.1/by-name/cache /cache nosuid nodev barrier=1
-
-    wait /dev/block/platform/msm_sdcc.1/by-name/system
-    mount ext4 /dev/block/platform/msm_sdcc.1/by-name/system /system ro barrier=1
-
     exec /system/bin/factoryreset
 
     mount_all fstab.qcom
     exec /system/bin/factoryreset_keep_media
-
-    wait /dev/block/platform/msm_sdcc.1/by-name/LTALabel
-    mount ext4 /dev/block/platform/msm_sdcc.1/by-name/LTALabel /lta-label nosuid nodev noatime noexec ro barrier=0
 
     exec /sbin/fota-ua c
 

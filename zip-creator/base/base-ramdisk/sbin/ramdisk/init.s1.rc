@@ -1,12 +1,13 @@
 on fs
+    mount_all fstab.qcom
+    swapon_all fstab.qcom
+
     # SONY: Start the TrimArea Daemon. It must be started before fota-ua
     wait /dev/block/platform/msm_sdcc.1/by-name/TA
     class_start trimarea
     exec /sbin/wait4tad_static
 
     exec /system/bin/factoryreset
-
-    mount_all fstab.qcom
     exec /system/bin/factoryreset_keep_media
 
     exec /sbin/fota-ua c

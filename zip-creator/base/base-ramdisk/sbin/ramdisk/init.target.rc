@@ -65,10 +65,6 @@ service scd /system/bin/scd
     user system
     group system
 
-#Start the qcom-system-daemon service
-service qcomsysd /system/bin/qcom-system-daemon
-   class main
-
 service time_daemon /system/bin/time_daemon
    class late_start
    user root
@@ -77,12 +73,6 @@ service time_daemon /system/bin/time_daemon
 service mpdecision /system/bin/mpdecision --avg_comp
    user root
    disabled
-
-#start GNSS/Sensor interface daemon
-service gsiff_daemon /system/bin/gsiff_daemon
-   class late_start
-   user system
-   group gps net_raw
 
 service thermal-engine /system/bin/thermal-engine
    class main
@@ -114,11 +104,6 @@ service qcamerasvr /system/bin/mm-qcamera-daemon
    class late_start
    user camera
    group camera system inet input graphics
-
-service audiod /system/bin/audiod
-   class late_start
-   user system
-   group system
 
 service swapping /system/bin/sh /system/etc/enable_swap.sh
     class core

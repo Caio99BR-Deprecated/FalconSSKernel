@@ -460,13 +460,6 @@ on property:vold.decrypt=trigger_shutdown_framework
     class_reset late_start
     class_reset main
 
-on property:sys.powerctl=*
-    powerctl ${sys.powerctl}
-
-# system server cannot write to /proc/sys files, so proxy it through init
-on property:sys.sysctl.extra_free_kbytes=*
-    write /proc/sys/vm/extra_free_kbytes ${sys.sysctl.extra_free_kbytes}
- 
 # copy from Nanhu for porting MTBF from Nanhu by kakaxiao 2013/08/05
 # add by junwang
 on property:ro.debuggable=1
@@ -651,48 +644,6 @@ service akmd /system/bin/magnetic -m 6
 
 service isdbtd /system/bin/isdbtd 
     class main        
-
-# Logcat service
-
-ifneq ($(TARGET_BUILD_VARIANT),user)
-
-service lc_main /system/xbin/lc_main
-    class main
-    user root
-    group root
-    disabled
-
-service lc_event /system/xbin/lc_event
-    class main
-    user root
-    group root
-    disabled
-
-service lc_radio /system/xbin/lc_radio
-    class main
-    user root
-    group root
-    disabled
-
-service lc_kernel /system/xbin/lc_kernel
-    class main
-    user root
-    group root
-    disabled
-
-service lc_bugreport /system/xbin/lc_bugreport
-    class main
-    user root
-    group root
-    disabled
-
-service lc_qxdm /system/xbin/lc_qxdm
-    class main
-    user root
-    group root
-    disabled
-    
-endif
 
 service postman /system/bin/postman
     class main

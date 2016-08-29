@@ -35,8 +35,6 @@ on boot
     # Disable C_A_D
     exec system/bin/ctrlaltdel soft
 
-    ONLY_IN_VARIANT(eng, setprop persist.usb.eng 1)
-
 on property:sys.usb.config=mass_storage
    exec /init.usbmode.sh
    stop adbd
@@ -88,11 +86,6 @@ on property:sys.usb.config=ncm,adb
    exec /init.usbmode.sh
    start adbd
    setprop sys.usb.state ${sys.usb.config}
-
-# Start usbeng
-service usbeng /system/bin/usbeng
-    class late_start
-    oneshot
 
 service qcom-usb-sh /system/bin/sh /init.qcom.usb.sh
     class core

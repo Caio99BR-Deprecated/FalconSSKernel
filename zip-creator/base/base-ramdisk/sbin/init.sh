@@ -1,7 +1,7 @@
 #!/sbin/busybox sh
 set +x
-_PATH="$PATH"
-export PATH=/sbin
+_PATH=${PATH}
+export PATH="/sbin"
 
 busybox cd /
 busybox date >> boot.txt
@@ -10,10 +10,10 @@ busybox rm /init
 
 triggerled() {
 # Use this <http://www.nameacolor.com/Color%20numbers.htm>
-busybox echo $1 > /sys/class/leds/red/brightness
-busybox echo $2 > /sys/class/leds/green/brightness
-busybox echo $3 > /sys/class/leds/notification/brightness
-busybox echo $4 > /sys/class/leds/lm3533-light-sns/rgb_brightness
+busybox echo ${1} > /sys/class/leds/red/brightness
+busybox echo ${2} > /sys/class/leds/green/brightness
+busybox echo ${3} > /sys/class/leds/notification/brightness
+busybox echo ${4} > /sys/class/leds/lm3533-light-sns/rgb_brightness
 }
 
 # include device specific vars
@@ -51,10 +51,13 @@ busybox sleep 3
 # boot decision
 if [ -s /dev/keycheck ] || busybox grep -q warmboot=0x77665502 /proc/cmdline
 then
-	# trigger ON cyan LED for recoveryboot
+	# trigger ON cyan LED for recovery
 	triggerled 0 255 255 65535
-	# recovery ramdisk
+
+	# extract recovery ramdisk from fota
 	extract_elf_ramdisk -i ${BOOTREC_FOTA} -o /sbin/ramdisk-recovery.cpio -t / -c
+
+	# recovery ramdisk
 	load_image="/sbin/ramdisk-recovery.cpio"
 	busybox echo "RECOVERY BOOT" >> boot.txt
 else
@@ -66,16 +69,16 @@ fi
 # kill the keycheck process
 busybox pkill -f "busybox cat ${BOOTREC_EVENT}"
 
-# unpack the ramdisk image
-busybox cpio -i < ${load_image}
-
 # trigger OFF LED
 triggerled 0 0 0 0
+
+# unpack the ramdisk image
+busybox cpio -i < ${load_image}
 
 busybox umount /proc
 busybox umount /sys
 
 busybox rm -fr /dev/*
 busybox date >> boot.txt
-export PATH="${_PATH}"
+export PATH=${_PATH}
 exec /init

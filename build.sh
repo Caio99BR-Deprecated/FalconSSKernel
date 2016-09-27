@@ -324,7 +324,7 @@ then
 		k_sub_level=$(cat Makefile | grep SUBLEVEL | cut -c 12- | head -1)
 		kernel_base="${k_version}.${k_patch_level}.${k_sub_level}"
 		release=$(date +%d""%m""%Y)
-		build=R7-FinalOld
+		build=R8
 		export zipfile="${custom_kernel}-${custom_kernel_branch}-${device_name}-${release}-${build}.zip"
 		# Check ZIP
 		if [ -f zip-creator/${zipfile} ]

@@ -145,7 +145,7 @@ then
 
 		# Make base of zip
 		original_dir=$(pwd)
-		zip_out="/tmp/zip-creator_out"
+		zip_out="${original_dir}/zip-creator_out"
 		rm -rf ${zip_out}/
 		mkdir -p ${zip_out}/META-INF/com/google/android/
 		mkdir -p ${zip_out}/base-ramdisk/
@@ -153,19 +153,35 @@ then
 		# Copy Update Binary
 		cp zip-creator/base/update-binary ${zip_out}/META-INF/com/google/android/
 
-		# Copy ramdisk and delete folder_holder files
+		# Enter on base-ramdisk
 		cd zip-creator/base/base-ramdisk/
+
+		# Copy ramdisk
 		find . -depth | cpio -pmdv ${zip_out}/base-ramdisk/
 		cd ${original_dir}/
-		rm -rf $(find ${zip_out}/base-ramdisk/ -name folder_holder)
 
-		# Make android ramdisk
-		cd ${zip_out}/base-ramdisk/sbin/ramdisk/
-		chmod +x ${original_dir}/zip-creator/base/ramdisk_permissions.sh
-		${original_dir}/zip-creator/base/ramdisk_permissions.sh
-		find . | cpio -o -H newc > ${zip_out}/base-ramdisk/sbin/ramdisk.cpio
-		cd ${original_dir}/
-		rm -rf ${zip_out}/base-ramdisk/sbin/ramdisk/
+		# Copy ramdisk and delete folder_holder files
+		if [ ${prebuilt_ramdisk} == "true" ]
+		then
+			# Delete folder to be built
+			rm -rf ${zip_out}/base-ramdisk/sbin/ramdisk/
+		else
+			# Delete prebuilt ramdisk
+			rm -rf ${zip_out}/base-ramdisk/sbin/ramdisk.cpio
+
+			# Delete folder_holder files
+			rm -rf $(find ${zip_out}/base-ramdisk/ -name folder_holder)
+
+			# Set permission because its on /tmp
+			cd ${zip_out}/base-ramdisk/sbin/ramdisk/
+			chmod +x ${original_dir}/zip-creator/base/ramdisk_permissions.sh
+			${original_dir}/zip-creator/base/ramdisk_permissions.sh
+
+			# Make android ramdisk and clean
+			find . | cpio -o -H newc > ${zip_out}/base-ramdisk/sbin/ramdisk.cpio
+			cd ${original_dir}/
+			rm -rf ${zip_out}/base-ramdisk/sbin/ramdisk/
+		fi
 
 		# Make main ramdisk
 		cd ${zip_out}/base-ramdisk/
@@ -278,6 +294,7 @@ then
 	custom_kernel=FalconSSKernel
 	builder=Caio99BR
 	custom_kernel_branch=KK-Stock
+	prebuilt_ramdisk=true
 	ARCH=arm
 
 	while true
